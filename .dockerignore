@@ -1,0 +1,40 @@
+# Ignore Git
+.git
+.gitignore
+
+# Node/NPM artifacts
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Composer dependencies (installed in container)
+vendor
+
+# Laravel runtime artifacts
+storage/framework/*
+storage/logs/*
+public/storage
+
+# Environment files
+.env
+.env.local
+.env.*.backup
+
+# Docker-related
+docker-compose*.yml
+.dockerignore
+Dockerfile
+upload_image.sh
+
+# IDE/editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Misc logs
+*.log
