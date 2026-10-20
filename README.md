@@ -4,7 +4,7 @@ This is the repo for a prototype created by T04G02
 Display interactive graphs to explore projects by status.
 
 Idea of architecture :
-
+```
 +-----------------------------------------------------------------------+
 |                          FRONTEND (Micro-frontends)                   |
 |                                                                       |
@@ -52,3 +52,5 @@ Idea of architecture :
 |   *Optional if DB is the source of   | |    connected React clients)  |
 |    truth and Kafka is just for logs* | |                              |
 +--------------------------------------+ +------------------------------+
+
+```
