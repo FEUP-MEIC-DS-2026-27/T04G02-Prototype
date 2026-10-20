@@ -4,7 +4,7 @@ set -euo pipefail
 cd /var/www
 
 # Ensure Laravel runtime directories exist
-mkdir -p storage/framework/{cache,sessions,views} bootstrap/cache
+mkdir -p storage/framework/{cache/data,sessions,views} storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 
 # Clear stale caches before rebuilding them
