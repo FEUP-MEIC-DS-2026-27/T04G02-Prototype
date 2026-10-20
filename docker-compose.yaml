@@ -7,6 +7,9 @@ services:
       - "8000:80"
     env_file:
       - .env
+    volumes:
+      - .:/var/www
+      - /var/www/vendor
     depends_on:
       postgres:
         condition: service_healthy
