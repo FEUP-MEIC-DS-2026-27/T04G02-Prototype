@@ -3,7 +3,7 @@ This is the repo for a prototype created by T04G02
 
 Display interactive graphs to explore projects by status.
 
-Idea of architecture :
+## Idea of architecture :
 ```
 +-----------------------------------------------------------------------+
 |                          FRONTEND (Micro-frontends)                   |
@@ -53,4 +53,15 @@ Idea of architecture :
 |    truth and Kafka is just for logs* | |                              |
 +--------------------------------------+ +------------------------------+
 
+```
+
+## Installing 
+
+In a fresh install, you must run 
+```shell
+cp .env.example .env
+```
+then run
+```shell
+docker compose up --build
 ```
