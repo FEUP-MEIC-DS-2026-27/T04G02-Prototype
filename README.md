@@ -65,7 +65,9 @@ then run
 ```shell
 docker compose up --build
 ```
-Once the server is up and running, run this command (just once):
+Once the server is up and running, generate the app key into your `.env` and recreate the container (just once):
 ```shell
-docker compose exec app php artisan generate app key
+sed -i "s|^APP_KEY=.*|APP_KEY=$(docker compose exec -T app php artisan key:generate --show)|" .env
+docker compose up -d --force-recreate app
 ```
+(`.env` is not copied into the image, so running `php artisan key:generate` inside the container has no effect.)
