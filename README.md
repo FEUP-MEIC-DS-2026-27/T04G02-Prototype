@@ -65,3 +65,7 @@ then run
 ```shell
 docker compose up --build
 ```
+Once the server is up and running, run this command (just once):
+```shell
+docker compose exec app php artisan generate app key
+```
