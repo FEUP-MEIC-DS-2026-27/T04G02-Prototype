@@ -57,7 +57,7 @@ Display interactive graphs to explore projects by status.
 
 ## Installing 
 
-In a fresh install, you must run 
+In a fresh install, you must run :
 ```shell
 cp .env.example .env
 ```
@@ -70,8 +70,8 @@ docker compose up -d
 
 Once the server is up and running, generate the app key into your `.env` and recreate the container (just once):
 ```shell
-sed -i "s|^APP_KEY=.*|APP_KEY=$(docker compose exec -T app php artisan key:generate --show)|" .env
-docker compose up -d --force-recreate app
+$key = docker compose exec -T app php artisan key:generate --show
+(Get-Content .env) -replace '^APP_KEY=.*', "APP_KEY=$key" | Set-Content .env
 ```
 
 OR
