@@ -61,13 +61,24 @@ In a fresh install, you must run
 ```shell
 cp .env.example .env
 ```
-then run
+then build the image and install the PHP dependencies in the shared project volume:
 ```shell
-docker compose up --build
+docker compose build app
+docker compose run --rm --no-deps --entrypoint composer app install --optimize-autoloader --prefer-dist --no-progress --no-interaction --no-scripts
+docker compose up -d
 ```
+
 Once the server is up and running, generate the app key into your `.env` and recreate the container (just once):
 ```shell
 sed -i "s|^APP_KEY=.*|APP_KEY=$(docker compose exec -T app php artisan key:generate --show)|" .env
+docker compose up -d --force-recreate app
+```
+
+OR
+
+```shell
+$key = docker compose exec -T app php artisan key:generate --show
+(Get-Content .env) -replace '^APP_KEY=.*', "APP_KEY=$key" | Set-Content .env
 docker compose up -d --force-recreate app
 ```
 (`.env` is not copied into the image, so running `php artisan key:generate` inside the container has no effect.)
