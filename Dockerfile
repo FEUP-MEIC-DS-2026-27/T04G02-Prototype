@@ -1,10 +1,6 @@
 FROM php:8.3-fpm
 
-# Install system dependencies and required PHP extensions
-# - nginx: web server
-# - libpq-dev: PostgreSQL client libraries (needed for pdo_pgsql)
-# - ca-certificates: enable HTTPS in PHP/cURL
-# Also remove default nginx site to avoid conflicts.
+# Install system dependencies, build tools, and required PHP extensions
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        nginx \
@@ -13,7 +9,12 @@ RUN apt-get update \
        zip \
        unzip \
        git \
+       autoconf \
+       build-essential \
+       librdkafka-dev \
     && docker-php-ext-install pdo_pgsql \
+    && pecl install rdkafka \
+    && docker-php-ext-enable rdkafka \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 
@@ -37,6 +38,12 @@ COPY docker_run.sh /docker_run.sh
 
 # Ensure entrypoint script is executable
 RUN chmod +x /docker_run.sh
+
+# Node.js + npm from the official Node image
+COPY --from=node:22 /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22 /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # Expose HTTP port
 EXPOSE 80
