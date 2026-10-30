@@ -24,9 +24,9 @@ export function ProjectStatusTracker() {
         try {
             await fetch(`/api/projects/${id}/status`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'Accept': 'application/json' 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify({ status: newStatus }),
             });
@@ -44,6 +44,7 @@ export function ProjectStatusTracker() {
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
             setEvents((prev) => [data, ...prev.slice(0, 4)]); // Keep top 5 latest events
+
             fetchProjects(); // Re-sync metric state & chart data
         };
 
@@ -76,13 +77,13 @@ export function ProjectStatusTracker() {
         };
         const s = styles[status] || styles.pending;
         return (
-            <span style={{ 
-                backgroundColor: s.bg, 
-                color: s.color, 
-                padding: '0.25rem 0.6rem', 
-                borderRadius: '12px', 
-                fontSize: '0.8rem', 
-                fontWeight: '600' 
+            <span style={{
+                backgroundColor: s.bg,
+                color: s.color,
+                padding: '0.25rem 0.6rem',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: '600'
             }}>
                 {s.label}
             </span>
@@ -132,7 +133,7 @@ export function ProjectStatusTracker() {
                         <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
                             {events.map((evt, idx) => (
                                 <li key={idx} style={{ padding: '0.6rem 0', borderBottom: '1px solid #f3f4f6', fontSize: '0.875rem' }}>
-                                    ⚡ Project <strong>#{evt.project_id}</strong> updated to{' '}
+                                    ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong> updated to{' '}
                                     <span style={{ color: '#2563eb', fontWeight: '600' }}>{evt.status}</span>
                                     <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{evt.timestamp}</div>
                                 </li>
@@ -181,52 +182,52 @@ export function ProjectStatusTracker() {
 }
 
 // Styling Objects
-const cardStyle = { 
-    padding: '1.25rem', 
-    borderRadius: '10px', 
-    border: '1px solid #e5e7eb', 
-    textAlign: 'center', 
-    backgroundColor: '#ffffff', 
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)' 
+const cardStyle = {
+    padding: '1.25rem',
+    borderRadius: '10px',
+    border: '1px solid #e5e7eb',
+    textAlign: 'center',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
 };
 
-const panelStyle = { 
-    padding: '1.5rem', 
-    borderRadius: '10px', 
-    border: '1px solid #e5e7eb', 
-    backgroundColor: '#ffffff', 
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)' 
+const panelStyle = {
+    padding: '1.5rem',
+    borderRadius: '10px',
+    border: '1px solid #e5e7eb',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
 };
 
-const labelStyle = { 
-    color: '#6b7280', 
-    fontSize: '0.85rem', 
-    fontWeight: '500' 
+const labelStyle = {
+    color: '#6b7280',
+    fontSize: '0.85rem',
+    fontWeight: '500'
 };
 
-const countStyle = { 
-    fontSize: '2rem', 
-    fontWeight: '700', 
-    marginTop: '0.25rem' 
+const countStyle = {
+    fontSize: '2rem',
+    fontWeight: '700',
+    marginTop: '0.25rem'
 };
 
-const titleStyle = { 
-    margin: '0 0 1rem 0', 
-    fontSize: '1.1rem', 
-    fontWeight: '600', 
-    color: '#111827' 
+const titleStyle = {
+    margin: '0 0 1rem 0',
+    fontSize: '1.1rem',
+    fontWeight: '600',
+    color: '#111827'
 };
 
-const cellStyle = { 
-    padding: '0.75rem', 
-    fontSize: '0.9rem' 
+const cellStyle = {
+    padding: '0.75rem',
+    fontSize: '0.9rem'
 };
 
-const selectStyle = { 
-    padding: '0.35rem 0.6rem', 
-    borderRadius: '6px', 
-    border: '1px solid #d1d5db', 
-    backgroundColor: '#fff', 
+const selectStyle = {
+    padding: '0.35rem 0.6rem',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    backgroundColor: '#fff',
     cursor: 'pointer',
     fontSize: '0.85rem'
 };
