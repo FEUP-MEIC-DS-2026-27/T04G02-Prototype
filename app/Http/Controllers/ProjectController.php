@@ -22,7 +22,7 @@ class ProjectController extends Controller
             }),
             'stats' => $this->getStats($projects),
             'my_stats' => $user ? $this->getStats($projects->where('owner_id', $user->id)) : $this->emptyStats(),
-            'current_user' => $user ? ['id' => $user->id, 'name' => $user->name] : null,
+            // 'current_user' => $user ? ['id' => $user->id, 'name' => $user->name] : null,
         ]);
     }
 
