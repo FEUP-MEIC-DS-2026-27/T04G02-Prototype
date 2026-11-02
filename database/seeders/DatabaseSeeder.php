@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,13 +17,31 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-    $this->call([
+        $users = collect([
+            User::factory()->create([
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+            ]),
+            User::factory()->create([
+                'name' => 'Product Owner',
+                'email' => 'owner@example.com',
+            ]),
+        ]);
+
+        $this->call([
             ProjectSeeder::class,
         ]);
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+
+        $this->assignOwners($users);
+    }
+
+    /**
+     * Give each project an owner, rotating through the users.
+     */
+    private function assignOwners(Collection $users): void
+    {
+        foreach (Project::query()->orderBy('id')->get() as $index => $project) {
+            $project->update(['owner_id' => $users[$index % $users->count()]->id]);
+        }
     }
 }
