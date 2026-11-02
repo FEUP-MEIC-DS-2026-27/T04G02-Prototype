@@ -1,12 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+const emptyStats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
+const statusOptions = [['pending', 'Pending'], ['in_progress', 'In Progress'], ['completed', 'Completed']];
+const statusLabels = Object.fromEntries(statusOptions);
+
 export function ProjectStatusTracker() {
     const [projects, setProjects] = useState([]);
-    const [stats, setStats] = useState({ total: 0, pending: 0, in_progress: 0, completed: 0 });
+    const [stats, setStats] = useState(emptyStats);
+    const [myStats, setMyStats] = useState(emptyStats);
+    const [activeTab, setActiveTab] = useState('all');
+    // const [currentUser, setCurrentUser] = useState(null);
     const [events, setEvents] = useState([]);
 
     const fetchProjects = async () => {
@@ -14,7 +21,9 @@ export function ProjectStatusTracker() {
             const res = await fetch('/api/projects');
             const data = await res.json();
             setProjects(data.projects || []);
-            setStats(data.stats || { total: 0, pending: 0, in_progress: 0, completed: 0 });
+            setStats(data.stats || emptyStats);
+            // setCurrentUser(data.current_user || null);
+            setMyStats(data.my_stats || emptyStats);
         } catch (err) {
             console.error('Error fetching project data:', err);
         }
@@ -56,178 +65,130 @@ export function ProjectStatusTracker() {
         return () => eventSource.close();
     }, []);
 
-    // Chart Data
-    const doughnutData = {
-        labels: ['Pending', 'In Progress', 'Completed'],
-        datasets: [
-            {
-                data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#eab308', '#2563eb', '#16a34a'],
+    function DoughnutData({ title, stats }) {
+        const isEmpty = stats.pending + stats.in_progress + stats.completed === 0;
+        const data = {
+            labels: isEmpty ? ['No projects'] : ['Pending', 'In Progress', 'Completed'],
+            datasets: [{
+                data: isEmpty ? [1] : [stats.pending, stats.in_progress, stats.completed],
+                backgroundColor: isEmpty ? ['#c5c5c5'] : ['#eab308', '#2563eb', '#16a34a'],
                 borderWidth: 2,
                 borderColor: '#ffffff',
-            },
-        ],
-    };
-
-    const statusBadge = (status) => {
-        const styles = {
-            pending: { bg: '#fef9c3', color: '#854d0e', label: 'Pending' },
-            in_progress: { bg: '#dbeafe', color: '#1e40af', label: 'In Progress' },
-            completed: { bg: '#dcfce7', color: '#166534', label: 'Completed' },
+            }],
         };
-        const s = styles[status] || styles.pending;
-        return (
-            <span style={{
-                backgroundColor: s.bg,
-                color: s.color,
-                padding: '0.25rem 0.6rem',
-                borderRadius: '12px',
-                fontSize: '0.8rem',
-                fontWeight: '600'
-            }}>
-                {s.label}
-            </span>
-        );
-    };
+
+        return <section className="table"><h2 className="table_title">{title}</h2><div className="chart"><Doughnut data={data} options={{ maintainAspectRatio: false }} /></div></section>;
+    }
+
+    function StatusBadge({ status }) {
+        return <span className={`status-badge status-badge-${status}`}>{statusLabels[status] || statusLabels.pending}</span>;
+    }
+
+    function StatCard({ label, value, variant = '' }) {
+        return <article className="stat-card">
+            <small>{label}</small>
+            <strong className={`stat-card_value stat-card_value-${variant}`}>{value}</strong>
+        </article>;
+    }
+
+    const visibleProjects = useMemo(
+        () => activeTab === 'my' ? projects.filter((project) => project.can_update) : projects,
+        [activeTab, projects],
+    );
 
     return (
-        <div style={{ padding: '2rem', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '1100px', margin: '0 auto', color: '#1f2937' }}>
-            <h1 style={{ marginBottom: '1.5rem', fontWeight: '700' }}>Project Dashboard</h1>
+        <main className="dashboard">
+            <h1 className="dashboard_heading">Project Dashboard</h1>
+            <section>
+                <h2 className="section-title">All Projects</h2>
+                <div className="stats-grid">
+                    <StatCard label="Total Projects" value={stats.total} />
+                    <StatCard label="Pending" value={stats.pending} variant="pending" />
+                    <StatCard label="In Progress" value={stats.in_progress} variant="progress" />
+                    <StatCard label="Completed" value={stats.completed} variant="completed" />
+                </div>
+            </section>
+            <section>
+                <h2 className="section-title">My Projects</h2>
+                <div className="stats-grid">
+                    <StatCard label="Total Projects" value={myStats.total} />
+                    <StatCard label="Pending" value={myStats.pending} variant="pending" />
+                    <StatCard label="In Progress" value={myStats.in_progress} variant="progress" />
+                    <StatCard label="Completed" value={myStats.completed} variant="completed" />
+                </div>
+            </section>
 
-            {/* 1. Metric Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={cardStyle}>
-                    <small style={labelStyle}>Total Projects</small>
-                    <div style={countStyle}>{stats.total}</div>
-                </div>
-                <div style={cardStyle}>
-                    <small style={labelStyle}>Pending</small>
-                    <div style={{ ...countStyle, color: '#ca8a04' }}>{stats.pending}</div>
-                </div>
-                <div style={cardStyle}>
-                    <small style={labelStyle}>In Progress</small>
-                    <div style={{ ...countStyle, color: '#2563eb' }}>{stats.in_progress}</div>
-                </div>
-                <div style={cardStyle}>
-                    <small style={labelStyle}>Completed</small>
-                    <div style={{ ...countStyle, color: '#16a34a' }}>{stats.completed}</div>
-                </div>
+            <div className="dashboard_charts">
+                <DoughnutData title="All Projects Status" stats={stats} />
+                <DoughnutData title="My Projects Status" stats={myStats} />
             </div>
 
-            {/* 2. Chart & SSE Feed */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-                {/* Doughnut Chart */}
-                <div style={panelStyle}>
-                    <h3 style={titleStyle}>Status Breakdown</h3>
-                    <div style={{ height: '220px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <Doughnut data={doughnutData} options={{ maintainAspectRatio: false }} />
-                    </div>
-                </div>
-
-                {/* Live Event Stream */}
-                <div style={panelStyle}>
-                    <h3 style={titleStyle}>Recent SSE Events</h3>
-                    {events.length === 0 ? (
-                        <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Listening for live events from Kafka...</p>
-                    ) : (
-                        <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-                            {events.map((evt, idx) => (
-                                <li key={idx} style={{ padding: '0.6rem 0', borderBottom: '1px solid #f3f4f6', fontSize: '0.875rem' }}>
-                                    ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong> updated to{' '}
-                                    <span style={{ color: '#2563eb', fontWeight: '600' }}>{evt.status}</span>
-                                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{evt.timestamp}</div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </div>
-
-            {/* 3. Project Inventory Table */}
-            <div style={panelStyle}>
-                <h3 style={titleStyle}>Project Inventory</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginTop: '1rem' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '2px solid #e5e7eb', color: '#6b7280', fontSize: '0.85rem' }}>
-                            <th style={cellStyle}>ID</th>
-                            <th style={cellStyle}>Project Name</th>
-                            <th style={cellStyle}>Status</th>
-                            <th style={cellStyle}>Change Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {projects.map((p) => (
-                            <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                <td style={cellStyle}>#{p.id}</td>
-                                <td style={{ ...cellStyle, fontWeight: '500' }}>{p.name}</td>
-                                <td style={cellStyle}>{statusBadge(p.status)}</td>
-                                <td style={cellStyle}>
-                                    <select
-                                        value={p.status}
-                                        onChange={(e) => handleStatusChange(p.id, e.target.value)}
-                                        style={selectStyle}
-                                    >
-                                        <option value="pending">Pending</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </td>
-                            </tr>
+            <section className="table table-events">
+                <h2 className="table_title">Recent SSE Events</h2>
+                {events.length === 0 ? (
+                    <p className="muted">Listening for live events from Kafka...</p>
+                ) : (
+                    <ul className="event-list">
+                        {events.map((evt, idx) => (
+                            <li className="event-list_item" key={idx}>
+                                ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong> updated to{' '}
+                                <span style={{ color: '#2563eb', fontWeight: '600' }}>{evt.status}</span>
+                                <time className="event-list_time">{evt.timestamp}</time>
+                            </li>
                         ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    </ul>
+                )}
+            </section>
+
+            <section className="table">
+                <h2 className="table_title">Project Inventory</h2>
+                <div className="tabs" role="tablist" aria-label="Project list">
+                    <button 
+                        className={activeTab === 'all' ? 'tab tab-active' : 'tab'} 
+                        onClick={() => setActiveTab('all')} role="tab" aria-selected={activeTab === 'all'} type="button">
+                        All Projects ({projects.length})
+                    </button>
+                    <button 
+                        className={activeTab === 'my' ? 'tab tab-active' : 'tab'} 
+                        onClick={() => setActiveTab('my')} role="tab" aria-selected={activeTab === 'my'} type="button">
+                        My Projects ({myStats.total})
+                    </button>
+                </div>
+                <div className="table-wrapper">
+                    <table className="project-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Project Name</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visibleProjects.map((project) => (
+                                <tr key={project.id}>
+                                    <td>#{project.id}</td>
+                                    <td className="project-table_name">{project.name}</td>
+                                    <td>{project.owner?.name || 'Anonym'}</td>
+                                    <td>
+                                        {activeTab === 'my' ? (
+                                            <select 
+                                                className="status-select" 
+                                                value={project.status} 
+                                                onChange={(event) => handleStatusChange(project.id, event.target.value)}>
+                                                {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                            </select>
+                                        ) : (
+                                            <StatusBadge status={project.status} />
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                { visibleProjects.length === 0 && <p className="muted"><br></br> You don't own projects. </p> }
+            </section>
+        </main>
     );
 }
-
-// Styling Objects
-const cardStyle = {
-    padding: '1.25rem',
-    borderRadius: '10px',
-    border: '1px solid #e5e7eb',
-    textAlign: 'center',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-};
-
-const panelStyle = {
-    padding: '1.5rem',
-    borderRadius: '10px',
-    border: '1px solid #e5e7eb',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-};
-
-const labelStyle = {
-    color: '#6b7280',
-    fontSize: '0.85rem',
-    fontWeight: '500'
-};
-
-const countStyle = {
-    fontSize: '2rem',
-    fontWeight: '700',
-    marginTop: '0.25rem'
-};
-
-const titleStyle = {
-    margin: '0 0 1rem 0',
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    color: '#111827'
-};
-
-const cellStyle = {
-    padding: '0.75rem',
-    fontSize: '0.9rem'
-};
-
-const selectStyle = {
-    padding: '0.35rem 0.6rem',
-    borderRadius: '6px',
-    border: '1px solid #d1d5db',
-    backgroundColor: '#fff',
-    cursor: 'pointer',
-    fontSize: '0.85rem'
-};
