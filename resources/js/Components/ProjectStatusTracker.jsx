@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 
@@ -7,6 +7,21 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const emptyStats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 const statusOptions = [['pending', 'Pending'], ['in_progress', 'In Progress'], ['completed', 'Completed']];
 const statusLabels = Object.fromEntries(statusOptions);
+
+const DoughnutData = memo(function DoughnutData({ title, stats }) {
+    const isEmpty = stats.pending + stats.in_progress + stats.completed === 0;
+    const data = {
+        labels: isEmpty ? ['No projects'] : ['Pending', 'In Progress', 'Completed'],
+        datasets: [{
+            data: isEmpty ? [1] : [stats.pending, stats.in_progress, stats.completed],
+            backgroundColor: isEmpty ? ['#c5c5c5'] : ['#eab308', '#2563eb', '#16a34a'],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+        }],
+    };
+
+    return <section className="table"><h2 className="table_title">{title}</h2><div className="chart"><Doughnut data={data} options={{ maintainAspectRatio: false }} /></div></section>;
+});
 
 export function ProjectStatusTracker() {
     const [projects, setProjects] = useState([]);
@@ -64,21 +79,6 @@ export function ProjectStatusTracker() {
 
         return () => eventSource.close();
     }, []);
-
-    function DoughnutData({ title, stats }) {
-        const isEmpty = stats.pending + stats.in_progress + stats.completed === 0;
-        const data = {
-            labels: isEmpty ? ['No projects'] : ['Pending', 'In Progress', 'Completed'],
-            datasets: [{
-                data: isEmpty ? [1] : [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: isEmpty ? ['#c5c5c5'] : ['#eab308', '#2563eb', '#16a34a'],
-                borderWidth: 2,
-                borderColor: '#ffffff',
-            }],
-        };
-
-        return <section className="table"><h2 className="table_title">{title}</h2><div className="chart"><Doughnut data={data} options={{ maintainAspectRatio: false }} /></div></section>;
-    }
 
     function StatusBadge({ status }) {
         return <span className={`status-badge status-badge-${status}`}>{statusLabels[status] || statusLabels.pending}</span>;
