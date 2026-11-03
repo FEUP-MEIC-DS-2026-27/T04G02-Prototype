@@ -2,12 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const { Kafka } = require('kafkajs');
 
+const PORT = Number(process.env.PORT || 8008);
+const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'project-status-kafka:29092').split(',');
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3003,http://localhost:3005').split(',');
+
 const app = express();
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGINS }));
 
 const kafka = new Kafka({
   clientId: 'sse-hub',
-  brokers: ['kafka:29092']
+  brokers: KAFKA_BROKERS
 });
 const consumer = kafka.consumer({ groupId: 'frontend-sse-group' });
 
@@ -49,10 +53,4 @@ const run = async () => {
 
 run().catch(console.error);
 
-app.listen(3001, () => console.log('SSE Hub running on port 3001'));
-// sse-hub/server.js
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
+app.listen(PORT, () => console.log(`SSE Hub running on port ${PORT}`));
