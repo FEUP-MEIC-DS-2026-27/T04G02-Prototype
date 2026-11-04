@@ -72,7 +72,7 @@ The code is baked into the image (there is no source volume), so rebuild after a
 ### One image, two roles
 
 The root `Dockerfile` builds a single image used by two services:
-- `project-status-api`: the default command (`serve`), php-fpm + nginx on port 8007
+- `project-status-api`: the default command (`serve`), php-fpm + nginx on port 8009
 - `project-status-consumer`: `php artisan kafka:consume-projects`
 
 Both read `DB_*` and `KAFKA_BROKERS` from the environment, and `docker/entrypoint.sh` caches the config from those values on start.
@@ -83,8 +83,8 @@ The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET
 
 | Service                    | URL / port                          | Purpose                                               |
 |----------------------------|-------------------------------------|-------------------------------------------------------|
-| `project-status-api`       | http://localhost:8007/api/projects  | Laravel API (nginx + php-fpm)                         |
-| `project-status-sse`       | http://localhost:8008/events        | Reads Kafka and pushes events to the browser over SSE |
+| `project-status-api`       | http://localhost:8009/api/projects  | Laravel API (nginx + php-fpm)                         |
+| `project-status-sse`       | http://localhost:8010/events        | Reads Kafka and pushes events to the browser over SSE |
 | `project-status-consumer`  | -                                   | Runs `php artisan kafka:consume-projects`             |
 | `project-status-kafka`     | internal only (`project-status-kafka:29092`) | Topic `project-status-events`                |
 | `project-status-zookeeper` | internal only                       | Used by Kafka                                         |
@@ -121,7 +121,7 @@ EOF
 ```
 The producer only publishes events; `project-status-consumer` is what creates the projects. You should see:
 - `Created project #N (external sim-1)` lines in `make logs`, followed by `Updated …` when the same `external_id` is sent again
-- the new projects in `GET http://localhost:8007/api/projects`, with their ids assigned by the database
+- the new projects in `GET http://localhost:8009/api/projects`, with their ids assigned by the database
 
 To watch the raw messages on the topic:
 ```shell

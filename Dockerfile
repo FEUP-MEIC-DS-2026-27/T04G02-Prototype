@@ -44,7 +44,7 @@ RUN chmod +x /usr/local/bin/entrypoint /usr/local/bin/serve
 # Defaults for running from the image alone; compose overrides them
 ENV APP_ENV=production \
     APP_DEBUG=false \
-    APP_URL=http://localhost:8007 \
+    APP_URL=http://localhost:8009 \
     LOG_CHANNEL=stderr \
     DB_CONNECTION=pgsql \
     DB_HOST=project-status-db \
@@ -60,7 +60,7 @@ ENV APP_ENV=production \
     CORS_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3005 \
     RUN_MIGRATIONS=true
 
-EXPOSE 8007
+EXPOSE 8009
 
 # The entrypoint prepares Laravel, then runs the command.
 # Default: the API (php-fpm + nginx). Consumer: `php artisan kafka:consume-projects`.

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Kafka } = require('kafkajs');
 
-const PORT = Number(process.env.PORT || 8008);
+const PORT = Number(process.env.PORT || 8010);
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'project-status-kafka:29092').split(',');
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3003,http://localhost:3005').split(',');
 

@@ -5,7 +5,7 @@ x-api-env: &api-env
   APP_KEY: ${APP_KEY:-}
   APP_ENV: ${APP_ENV:-local}
   APP_DEBUG: ${APP_DEBUG:-true}
-  APP_URL: http://localhost:8007
+  APP_URL: http://localhost:8009
   DB_HOST: project-status-db
   DB_PORT: 5432
   DB_DATABASE: ${DB_DATABASE:-laravel}
@@ -21,10 +21,10 @@ services:
       context: .
     image: project-status-api
     ports:
-      - "8007:8007"
+      - "8009:8009"
     environment: *api-env
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8007/up"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8009/up"]
       interval: 10s
       timeout: 3s
       start_period: 30s
@@ -53,9 +53,9 @@ services:
     build:
       context: ./sse-hub
     ports:
-      - "8008:8008"
+      - "8010:8010"
     environment:
-      PORT: 8008
+      PORT: 8010
       KAFKA_BROKERS: project-status-kafka:29092
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
     depends_on:
