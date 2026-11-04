@@ -77,6 +77,7 @@ The root `Dockerfile` builds a single image used by two services:
 
 Both read `DB_*` and `KAFKA_BROKERS` from the environment, and `docker/entrypoint.sh` caches the config from those values on start.
 The image is built with `composer install --no-dev`.
+The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET_RESET=earliest`), so events published before the consumer is ready aren't skipped.
 
 ## Services
 
@@ -110,39 +111,30 @@ Events with an invalid `status`, or with neither id, are skipped by `project-sta
 
 ### Simulating events from another system
 
-`kafka:simulate-projects` uses `ProjectFactory` to publish events for fake projects, as if another system sent them:
+Publish events with Kafka's console producer, one JSON object per line. Use an `external_id` starting with `sim-` so the test projects are easy to clean up:
 ```shell
-docker compose exec project-status-api php artisan kafka:simulate-projects 5 --updates
+docker compose exec -T project-status-kafka kafka-console-producer --bootstrap-server project-status-kafka:29092 --topic project-status-events <<'EOF'
+{"external_id":"sim-1","name":"CRM Import","status":"pending","timestamp":"2026-10-30T12:00:00Z"}
+{"external_id":"sim-2","name":"Billing Sync","status":"in_progress"}
+{"external_id":"sim-1","status":"completed"}
+EOF
 ```
+The producer only publishes events; `project-status-consumer` is what creates the projects. You should see:
+- `Created project #N (external sim-1)` lines in `make logs`, followed by `Updated …` when the same `external_id` is sent again
+- the new projects in `GET http://localhost:8007/api/projects`, with their ids assigned by the database
 
-| Argument / option | Default | Meaning                                                              |
-|-------------------|---------|----------------------------------------------------------------------|
-| `count`           | `10`    | Number of new projects to publish                                    |
-| `--delay`         | `500`   | Milliseconds between events (`--delay=0` sends them all at once)     |
-| `--updates`       | off     | Also send a second event with a different status for each project    |
-
-The command only publishes events; `project-status-consumer` is what creates the projects. Each fake project gets an `external_id` starting with `sim-`. You should see:
-- `Created project #N (external sim-…)` lines in `make logs`, followed by `Updated …` lines when `--updates` is used
-- the new projects in the dashboard's table and chart, with their ids assigned by the database
+To watch the raw messages on the topic:
+```shell
+docker compose exec project-status-kafka kafka-console-consumer --bootstrap-server project-status-kafka:29092 --topic project-status-events
+```
 
 To remove only the simulated projects:
 ```shell
 docker compose exec project-status-api php artisan tinker --execute="App\Models\Project::where('external_id', 'like', 'sim-%')->delete();"
 ```
-Or reset everything to the sample projects with `docker compose exec project-status-api php artisan migrate:fresh --seed`.
+Or reset everything to the sample projects with `make reset` (this also deletes the database volume).
 
-`ProjectFactory` uses Faker, which is a dev dependency (`require-dev`), so the command doesn't work in an image built with `composer install --no-dev`.
-
-To send a single hand-written event instead, use Kafka's console producer (one JSON object per line):
-```shell
-docker compose exec -T project-status-kafka kafka-console-producer --bootstrap-server project-status-kafka:29092 --topic project-status-events <<'EOF'
-{"external_id":"crm-1001","name":"CRM Import","status":"pending","timestamp":"2026-10-30T12:00:00Z"}
-EOF
-```
-To watch the raw messages on the topic:
-```shell
-docker compose exec project-status-kafka kafka-console-consumer --bootstrap-server project-status-kafka:29092 --topic project-status-events
-```
+> **`php artisan kafka:simulate-projects` doesn't work in the Docker image.** It builds fake projects with `ProjectFactory`, which needs Faker. Faker is a dev dependency, and the image is built with `composer install --no-dev` so test tools stay out of production. For the same reason, `migrate:fresh --seed` fails in the container, because `DatabaseSeeder` also uses a factory.
 
 ## Troubleshooting
 
@@ -154,6 +146,6 @@ docker compose exec project-status-kafka kafka-console-consumer --bootstrap-serv
 
 **`project-status-consumer` exits right away**: run `docker compose logs project-status-consumer`. If the command is missing, rebuild the image.
 
-**Simulated events don't create projects right away**: after `project-status-consumer` (re)starts, Kafka can take up to ~45 seconds to hand it the topic again. Events sent in that time are processed once it reconnects. Restart it with `docker compose restart project-status-consumer` after changing its code; no rebuild is needed.
+**Simulated events don't create projects right away**: after `project-status-consumer` (re)starts, Kafka can take up to ~45 seconds to hand it the topic again. Events sent in that time are processed once it reconnects. After changing its code, rebuild it with `docker compose up -d --build project-status-consumer` (the code is baked into the image).
 
 **`project-status-consumer` stops with `column "external_id" does not exist`**: the migration hasn't run yet. Run `docker compose exec project-status-api php artisan migrate`, then `docker compose restart project-status-consumer`.

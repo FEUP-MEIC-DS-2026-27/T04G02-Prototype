@@ -56,6 +56,7 @@ ENV APP_ENV=production \
     SESSION_DRIVER=file \
     QUEUE_CONNECTION=sync \
     KAFKA_BROKERS=project-status-kafka:29092 \
+    KAFKA_OFFSET_RESET=earliest \
     CORS_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3005 \
     RUN_MIGRATIONS=true
 
