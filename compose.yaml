@@ -12,6 +12,7 @@ x-api-env: &api-env
   DB_USERNAME: ${DB_USERNAME:-laravel}
   DB_PASSWORD: ${DB_PASSWORD:-secret}
   KAFKA_BROKERS: project-status-kafka:29092
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
 
 services:
   # Laravel API (default command of the image). Runs migrations on start.

@@ -89,7 +89,9 @@ The image is built with `composer install --no-dev`.
 | `project-status-zookeeper` | internal only                       | Used by Kafka                                         |
 | `project-status-db`        | internal only                       | Postgres, data kept in the `project-status-db-data` volume |
 
-The SSE hub only accepts the origins in `CORS_ORIGINS` (default: `localhost:3000`, `3003` and `3005`).
+The API and the SSE hub only accept the origins in `CORS_ORIGINS` (default: `localhost:3000`, `3003` and `3005`).
+
+The `projects` table lives in our own database (`project-status-db`), not in VA3's `search-db`. This service backs its own micro-frontend, so it owns its data. Other systems reach it through Kafka events (see below), not through a shared database.
 
 ## Kafka events
 
