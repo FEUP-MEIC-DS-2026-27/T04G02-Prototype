@@ -83,7 +83,6 @@ The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET
 
 | Service                    | URL / port                          | Purpose                                               |
 |----------------------------|-------------------------------------|-------------------------------------------------------|
-| `project-status-frontend`  | http://localhost:3005               | Dashboard: remote for h.i's VA3, also standalone |
 | `project-status-api`       | http://localhost:8011/api/projects  | Laravel API (nginx + php-fpm)                         |
 | `project-status-sse`       | http://localhost:8012/events        | Reads Kafka and pushes events to the browser over SSE |
 | `project-status-consumer`  | -                                   | Runs `php artisan kafka:consume-projects`             |

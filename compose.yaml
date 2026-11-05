@@ -15,13 +15,6 @@ x-api-env: &api-env
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
 
 services:
-  # Dashboard: Module Federation remote, also works standalone.
-  project-status-frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "3005:8080"
-
   # Laravel API (default command of the image). Runs migrations on start.
   project-status-api:
     build:
