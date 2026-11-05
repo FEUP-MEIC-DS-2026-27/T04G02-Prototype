@@ -21,32 +21,48 @@ RUN apt-get update \
 # Install Composer from its official image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set the working directory for the application code
 WORKDIR /var/www
 
-# Install PHP dependencies inside the container
+# Install PHP dependencies first so this layer is cached until composer.lock changes
 COPY composer.json composer.lock ./
-RUN composer install --optimize-autoloader --prefer-dist --no-progress --no-interaction --no-scripts
+RUN composer install --no-dev --prefer-dist --no-progress --no-interaction --no-scripts --no-autoloader
 
-# Copy application source into the image (owned by www-data)
+# Copy the application code, then build the optimized autoloader and package manifest
 COPY --chown=www-data:www-data . .
+RUN composer dump-autoload --no-dev --optimize --no-scripts \
+    && php artisan package:discover --ansi \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
 
-# Copy container configuration and entrypoint
+# Container configuration
 COPY ./etc/php/php.ini /usr/local/etc/php/conf.d/php.ini
 COPY ./etc/nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY docker_run.sh /docker_run.sh
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint
+COPY docker/serve.sh /usr/local/bin/serve
+RUN chmod +x /usr/local/bin/entrypoint /usr/local/bin/serve
 
-# Ensure entrypoint script is executable
-RUN chmod +x /docker_run.sh
+# Defaults for running from the image alone; compose overrides them
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    APP_URL=http://localhost:8009 \
+    LOG_CHANNEL=stderr \
+    DB_CONNECTION=pgsql \
+    DB_HOST=project-status-db \
+    DB_PORT=5432 \
+    DB_DATABASE=laravel \
+    DB_USERNAME=laravel \
+    DB_PASSWORD=secret \
+    CACHE_STORE=file \
+    SESSION_DRIVER=file \
+    QUEUE_CONNECTION=sync \
+    KAFKA_BROKERS=project-status-kafka:29092 \
+    KAFKA_OFFSET_RESET=earliest \
+    CORS_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3005 \
+    RUN_MIGRATIONS=true
 
-# Node.js + npm from the official Node image
-COPY --from=node:22 /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22 /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
- && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+EXPOSE 8009
 
-# Expose HTTP port
-EXPOSE 80
-
-# Entrypoint: run php-fpm in background + nginx in foreground
-CMD ["/docker_run.sh"]
+# The entrypoint prepares Laravel, then runs the command.
+# Default: the API (php-fpm + nginx). Consumer: `php artisan kafka:consume-projects`.
+ENTRYPOINT ["entrypoint"]
+CMD ["serve"]

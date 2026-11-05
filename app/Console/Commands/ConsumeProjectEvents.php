@@ -15,7 +15,7 @@ class ConsumeProjectEvents extends Command
 
     public function handle(): int
     {
-        $consumer = Kafka::consumer(['project-status-events'], 'laravel-projects-consumer', env('KAFKA_BROKERS', 'kafka:29092'))
+        $consumer = Kafka::consumer(['project-status-events'], 'laravel-projects-consumer', config('kafka.brokers'))
             ->withAutoCommit()
             ->withHandler(function (ConsumerMessage $message) {
                 $body = $message->getBody();

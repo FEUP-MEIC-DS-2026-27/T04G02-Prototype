@@ -47,7 +47,7 @@ class SimulateProjectEvents extends Command
 
     private function publish(string $externalId, string $name, string $status): void
     {
-        Kafka::publish(env('KAFKA_BROKERS', 'kafka:29092'))
+        Kafka::publish(config('kafka.brokers'))
             ->onTopic('project-status-events')
             ->withMessage(new Message(body: [
                 'external_id' => $externalId,
