@@ -5,7 +5,7 @@ x-api-env: &api-env
   APP_KEY: ${APP_KEY:-}
   APP_ENV: ${APP_ENV:-local}
   APP_DEBUG: ${APP_DEBUG:-true}
-  APP_URL: http://localhost:8009
+  APP_URL: http://localhost:8011
   DB_HOST: project-status-db
   DB_PORT: 5432
   DB_DATABASE: ${DB_DATABASE:-laravel}
@@ -15,13 +15,20 @@ x-api-env: &api-env
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
 
 services:
+  # Dashboard: Module Federation remote, also works standalone.
+  project-status-frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3005:8080"
+
   # Laravel API (default command of the image). Runs migrations on start.
   project-status-api:
     build:
       context: .
     image: project-status-api
     ports:
-      - "8009:8009"
+      - "8011:8009"
     environment: *api-env
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8009/up"]
@@ -53,7 +60,7 @@ services:
     build:
       context: ./sse-hub
     ports:
-      - "8010:8010"
+      - "8012:8010"
     environment:
       PORT: 8010
       KAFKA_BROKERS: project-status-kafka:29092
