@@ -83,8 +83,9 @@ The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET
 
 | Service                    | URL / port                          | Purpose                                               |
 |----------------------------|-------------------------------------|-------------------------------------------------------|
-| `project-status-api`       | http://localhost:8009/api/projects  | Laravel API (nginx + php-fpm)                         |
-| `project-status-sse`       | http://localhost:8010/events        | Reads Kafka and pushes events to the browser over SSE |
+| `project-status-frontend`  | http://localhost:3005               | Dashboard: remote for h.i's VA3, also standalone |
+| `project-status-api`       | http://localhost:8011/api/projects  | Laravel API (nginx + php-fpm)                         |
+| `project-status-sse`       | http://localhost:8012/events        | Reads Kafka and pushes events to the browser over SSE |
 | `project-status-consumer`  | -                                   | Runs `php artisan kafka:consume-projects`             |
 | `project-status-kafka`     | internal only (`project-status-kafka:29092`) | Topic `project-status-events`                |
 | `project-status-zookeeper` | internal only                       | Used by Kafka                                         |
@@ -121,7 +122,7 @@ EOF
 ```
 The producer only publishes events; `project-status-consumer` is what creates the projects. You should see:
 - `Created project #N (external sim-1)` lines in `make logs`, followed by `Updated …` when the same `external_id` is sent again
-- the new projects in `GET http://localhost:8009/api/projects`, with their ids assigned by the database
+- the new projects in `GET http://localhost:8011/api/projects`, with their ids assigned by the database
 
 To watch the raw messages on the topic:
 ```shell
@@ -137,8 +138,6 @@ Or reset everything to the sample projects with `make reset` (this also deletes 
 > **`php artisan kafka:simulate-projects` doesn't work in the Docker image.** It builds fake projects with `ProjectFactory`, which needs Faker. Faker is a dev dependency, and the image is built with `composer install --no-dev` so test tools stay out of production. For the same reason, `migrate:fresh --seed` fails in the container, because `DatabaseSeeder` also uses a factory.
 
 ## Troubleshooting
-
-**Blank page on `/`**: expected. The image no longer builds the Vite/Blade dashboard; it is moving to the `frontend/` Module Federation app.
 
 **Chart shows all zeros**: the projects table is empty. Restart `project-status-api` to re-seed it, or run `make reset`.
 
