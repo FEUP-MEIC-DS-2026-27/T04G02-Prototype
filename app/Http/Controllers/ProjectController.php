@@ -40,7 +40,7 @@ class ProjectController extends Controller
             ]
         );
 
-        Kafka::publish(env('KAFKA_BROKERS', 'kafka:29092'))
+        Kafka::publish(config('kafka.brokers'))
             ->onTopic('project-status-events')
             ->withMessage($message)
             ->send();
