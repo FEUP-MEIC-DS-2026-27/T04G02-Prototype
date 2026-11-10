@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["@rsbuild/core/types"]
   },
-  "include": ["src", "*.ts"]
+  "include": ["src", "tests", "*.ts"]
 }
