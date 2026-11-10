@@ -62,7 +62,7 @@ From a fresh clone, with no other setup:
 docker compose up -d --build
 ```
 The API container runs the migrations on start and seeds the sample projects when the table is empty. The consumer waits for the API to be healthy, so the tables always exist before it starts.
-`make up`, `make stop`, `make logs` and `make reset` (drops the database volume) wrap the usual commands.
+`make up`, `make stop`, `make logs`, `make reset` (drops the database volume) and `make test` (see [Testing](#testing)) wrap the usual commands.
 
 A `.env` file is optional: `compose.yaml` has defaults for everything, and `.env.example` lists what you can override.
 Without an `APP_KEY`, the container generates a temporary one on each start. That's fine because the API has no sessions or logins. To pin one, run `docker compose run --rm --no-deps project-status-api php artisan key:generate --show` and put the result in `.env`.
@@ -137,11 +137,61 @@ Or reset everything to the sample projects with `make reset` (this also deletes 
 
 > **`php artisan kafka:simulate-projects` doesn't work in the Docker image.** It builds fake projects with `ProjectFactory`, which needs Faker. Faker is a dev dependency, and the image is built with `composer install --no-dev` so test tools stay out of production. For the same reason, `migrate:fresh --seed` fails in the container, because `DatabaseSeeder` also uses a factory.
 
+## Testing
+
+### Backend (Laravel)
+
+```shell
+make test
+```
+This runs the PHPUnit suite in a throwaway container built from the API image, so you don't need PHP installed and the rest of the stack doesn't need to be running. The dev dependencies (PHPUnit, Faker, …) are installed into the `project-status-test-vendor` volume, not into the image.
+
+The tests always use an in-memory SQLite database and fake Kafka, so they never touch `project-status-db` or `project-status-kafka`.
+
+> **Don't use `docker compose exec project-status-api php artisan test`.** The running API container has no dev dependencies, and its config is cached for Postgres. The tests refuse to start when they aren't on the in-memory SQLite database, so your data stays safe, but they won't run there.
+
+Without Docker (PHP 8.3 with the `rdkafka` extension):
+```shell
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan test
+```
+To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
+
+| Folder                  | What it covers                                                               |
+|-------------------------|------------------------------------------------------------------------------|
+| `tests/Feature/Api`     | `GET /api/projects`, `POST /api/projects/{id}/status` (incl. the Kafka event it publishes), CORS for the h.i origins |
+| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events |
+
+### Frontend (dashboard)
+
+```shell
+cd frontend
+npm ci
+npm run typecheck
+npm run build   # optional, enables the build-output check below
+npm test        # or `npm run test:watch` while developing
+```
+
+| File                                       | What it covers                                                     |
+|--------------------------------------------|--------------------------------------------------------------------|
+| `tests/ProjectStatusTracker.test.tsx`      | The dashboard against a fake API and SSE hub: loading, status changes, errors, live events, reconnecting, closing the connection on unmount |
+| `tests/federation-contract.test.ts`        | What h.i's VA3 relies on: remote name `project_status`, the `./Dashboard` expose, shared React/router versions, `contractVersion`, and `dist/mf-manifest.json` (only after `npm run build`) |
+
+If a federation contract test fails, h.i will break too. Change `packages/config/src/federation.ts` in h.i at the same time, or don't make the change.
+
+### CI
+
+`.github/workflows/tests.yml` runs both suites on every push and pull request. The frontend job type-checks, builds, then runs the tests, so the build-output check always runs there.
+
 ## Troubleshooting
 
 **Chart shows all zeros**: the projects table is empty. Restart `project-status-api` to re-seed it, or run `make reset`.
 
 **"Recent SSE Events" never updates**: check that `project-status-sse` and `project-status-kafka` are running (`docker compose ps`). Kafka can take a while to start, and the SSE hub retries until it can connect.
+
+**`php artisan test` says the tests must run on the in-memory SQLite database**: the config is cached (for example inside the API container). Use `make test`, or run `php artisan config:clear` before testing locally.
 
 **`project-status-consumer` exits right away**: run `docker compose logs project-status-consumer`. If the command is missing, rebuild the image.
 
