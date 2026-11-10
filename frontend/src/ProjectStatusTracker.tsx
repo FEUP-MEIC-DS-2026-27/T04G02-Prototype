@@ -145,16 +145,43 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
     }, [fetchProjects, sseUrl]);
 
     // Chart Data
-    const doughnutData = {
+    const statusDistributionData = {
         labels: ['Pending', 'In Progress', 'Completed'],
         datasets: [
             {
-                data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'], // Bootstrap warning, primary, success
-                borderWidth: 2,
+                data: [
+                    stats.pending,
+                    stats.in_progress,
+                    stats.completed,
+                ],
+                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
                 borderColor: '#ffffff',
+                borderWidth: 2,
             },
         ],
+    };
+
+    const statusDistributionOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom' as const,
+            },
+            tooltip: {
+                callbacks: {
+                    label: (context: { label?: string; raw?: unknown }) => {
+                        const value = Number(context.raw ?? 0);
+                        const percentage =
+                            stats.total === 0
+                                ? 0
+                                : Math.round((value / stats.total) * 100);
+
+                        return ` Amount: ${value} (${percentage}%)`;
+                    },
+                },
+            },
+        },
     };
 
     return (
@@ -226,9 +253,9 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
                 <div className="col-12 col-lg-6">
                     <div className="card h-100">
                         <div className="card-body">
-                            <h3 className="h5 mb-4">Status Breakdown</h3>
+                            <h3 className="h5 mb-4">Status Distribution</h3>
                             <div className="d-flex justify-content-center" style={{ height: '220px' }}>
-                                <Doughnut data={doughnutData} options={{ maintainAspectRatio: false }} />
+                                <Doughnut data={statusDistributionData} options={statusDistributionOptions} />
                             </div>
                         </div>
                     </div>
