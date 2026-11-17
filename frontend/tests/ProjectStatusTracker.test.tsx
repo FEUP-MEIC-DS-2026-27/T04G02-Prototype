@@ -4,13 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 import ProjectStatusTracker from '../src/ProjectStatusTracker';
 import { FakeEventSource } from './support/fakeEventSource';
 import { installFakeProjectsApi, type FakeProject } from './support/fakeProjectsApi';
+import { createBarOptions, createStatusDistributionData } from '../src/ProjectStatusTracker';
+
 
 // Chart.js needs a real canvas, which jsdom lacks. Render the numbers it receives instead.
-vi.mock('react-chartjs-2', () => ({
-  Doughnut: ({ data }: { data: { datasets: { data: number[] }[] } }) => (
-    <div data-testid="status-chart">{data.datasets[0].data.join(',')}</div>
-  ),
-}));
+vi.mock('react-chartjs-2', () => {
+  const fake = (type: string) =>
+    ({ data }: { data: { datasets: { data: number[] }[] } }) => (
+      <div data-testid="status-chart" data-chart-type={type}>
+        {data.datasets[0].data.join(',')}
+      </div>
+    );
+  return { Doughnut: fake('doughnut'), Bar: fake('bar') };
+});
 
 // The URLs h.i passes in as props; deliberately not the defaults.
 const API = 'http://api.test';
@@ -191,4 +197,37 @@ describe('ProjectStatusTracker', () => {
 
     expect(source.closed).toBe(true);
   });
+  it('switches the status chart between bar and donut, keeping the same data', async () => {
+    const user = userEvent.setup();
+    installFakeProjectsApi(API, seed);
+    renderDashboard();
+    await screen.findByRole('cell', { name: 'Alpha' });
+
+    // Default is bar.
+    expect(screen.getByRole('button', { name: 'Bar' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Donut' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('status-chart')).toHaveAttribute('data-chart-type', 'bar');
+
+    await user.click(screen.getByRole('button', { name: 'Donut' }));
+    expect(screen.getByRole('button', { name: 'Donut' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('status-chart')).toHaveAttribute('data-chart-type', 'doughnut');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,1');
+
+    await user.click(screen.getByRole('button', { name: 'Bar' }));
+    expect(screen.getByTestId('status-chart')).toHaveAttribute('data-chart-type', 'bar');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,1');
+  });
+  it('builds chart data from stats and a percentage tooltip', () => {
+  const stats = { total: 4, pending: 1, in_progress: 1, completed: 2 };
+  expect(createStatusDistributionData(stats).datasets[0].data).toEqual([1, 1, 2]);
+
+  const label = createBarOptions(stats).plugins.tooltip.callbacks.label;
+  expect(label({ raw: 2 })).toBe(' Amount: 2 (50%)');
+  expect(label({ raw: 0 })).toBe(' Amount: 0 (0%)');
+});
+
+it('does not divide by zero when there are no projects', () => {
+  const empty = { total: 0, pending: 0, in_progress: 0, completed: 0 };
+  expect(createBarOptions(empty).plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' Amount: 0 (0%)');
+});
 });
