@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
 import Loading from './Loading';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 // Part of the contract with VA3: bump this when the props below change incompatibly.
 export const contractVersion = 1;
@@ -20,7 +20,6 @@ interface ProjectStatusTrackerProps {
 }
 
 type ProjectStatus = 'pending' | 'in_progress' | 'completed';
-
 interface Project {
     id: number;
     name: string;
@@ -44,7 +43,13 @@ interface StatusEvent {
 }
 
 type LiveState = 'connecting' | 'live' | 'reconnecting';
+type ChartType = 'doughnut' | 'bar';
 
+
+const chartTypes: { value: ChartType; label: string }[] = [
+    { value: 'doughnut', label: 'Donut' },
+    { value: 'bar', label: 'Bar' },
+];
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 
 const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: string }> = {
@@ -53,19 +58,6 @@ const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: stri
     completed: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Completed' },
 };
 
-export function createStatusDistributionData(stats: Stats) {
-    return {
-        labels: ['Pending', 'In Progress', 'Completed'],
-        datasets: [
-            {
-                data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
-                borderColor: '#ffffff',
-                borderWidth: 2,
-            },
-        ],
-    };
-}
 
 export function createStatusDistributionOptions(stats: Stats) {
     return {
@@ -109,6 +101,50 @@ async function readJson<T>(res: Response, what: string): Promise<T> {
     }
     return res.json() as Promise<T>;
 }
+export function createStatusDistributionData(stats: Stats) {
+    return {
+        labels: ['Pending', 'In Progress', 'Completed'],
+        datasets: [
+            {
+                data: [stats.pending, stats.in_progress, stats.completed],
+                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
+                borderColor: '#ffffff',
+                borderWidth: 2,
+            },
+        ],
+    };
+}
+
+function createTooltip(stats: Stats) {
+    return {
+        callbacks: {
+            label: (context: { label?: string; raw?: unknown }) => {
+                const value = Number(context.raw ?? 0);
+                const percentage = stats.total === 0 ? 0 : Math.round((value / stats.total) * 100);
+                return ` Amount: ${value} (${percentage}%)`;
+            },
+        },
+    };
+}
+
+export function createDoughnutOptions(stats: Stats) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' as const }, tooltip: createTooltip(stats) },
+    };
+}
+
+export function createBarOptions(stats: Stats) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: createTooltip(stats) },
+        scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }, // counts are whole numbers
+        },
+    };
+}
 
 // Bootstrap classes only. The stylesheet comes from the host (integrated) or from
 // bootstrap.tsx (standalone), and the host owns the router.
@@ -121,7 +157,7 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
     const [updateError, setUpdateError] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [live, setLive] = useState<LiveState>('connecting');
-
+    const [chartType, setChartType] = useState<ChartType>('bar');
     const fetchProjects = useCallback(async (signal?: AbortSignal) => {
         try {
             const res = await fetch(`${apiUrl}/api/projects`, { signal });
@@ -185,8 +221,10 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
 
     // Chart Data
     const statusDistributionData = createStatusDistributionData(stats);
-    const statusDistributionOptions = createStatusDistributionOptions(stats);
-
+    const doughnutOptions = createDoughnutOptions(stats);
+    const barOptions = createBarOptions(stats);
+    //const statusDistributionOptions = createStatusDistributionOptions(stats);
+    // Chart Data
     return (
         <section aria-labelledby="project-status-title">
             <header className="mb-4">
@@ -256,12 +294,35 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
                 <div className="col-12 col-lg-6">
                     <div className="card h-100">
                         <div className="card-body">
-                            <h3 className="h5 mb-4">Status Distribution</h3>
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                                <h3 className="h5 mb-0">Status Distribution</h3>
+                                <div className="btn-group btn-group-sm" role="group" aria-label="Chart type">
+                                    {chartTypes.map((t) => (
+                                        <button
+                                            key={t.value}
+                                            type="button"
+                                            className={`btn ${chartType === t.value ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                                            aria-pressed={chartType === t.value}
+                                            onClick={() => setChartType(t.value)}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="d-flex justify-content-center" style={{ height: '220px' }}>
-                                <Doughnut data={statusDistributionData} options={statusDistributionOptions} />
+                                {chartType === 'bar' ? (
+                                    <Bar data={statusDistributionData} options={barOptions} />
+                                ) : (
+                                    <Doughnut data={statusDistributionData} options={doughnutOptions} />
+                                )}
                             </div>
                         </div>
                     </div>
+
+
+
+
                 </div>
 
                 <div className="col-12 col-lg-6">
