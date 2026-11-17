@@ -27,7 +27,7 @@ interface Project {
     status: ProjectStatus;
 }
 
-interface Stats {
+export interface Stats {
     total: number;
     pending: number;
     in_progress: number;
@@ -52,6 +52,45 @@ const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: stri
     in_progress: { bg: 'bg-primary-subtle', text: 'text-primary-emphasis', label: 'In Progress' },
     completed: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Completed' },
 };
+
+export function createStatusDistributionData(stats: Stats) {
+    return {
+        labels: ['Pending', 'In Progress', 'Completed'],
+        datasets: [
+            {
+                data: [stats.pending, stats.in_progress, stats.completed],
+                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
+                borderColor: '#ffffff',
+                borderWidth: 2,
+            },
+        ],
+    };
+}
+
+export function createStatusDistributionOptions(stats: Stats) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom' as const,
+            },
+            tooltip: {
+                callbacks: {
+                    label: (context: { label?: string; raw?: unknown }) => {
+                        const value = Number(context.raw ?? 0);
+                        const percentage =
+                            stats.total === 0
+                                ? 0
+                                : Math.round((value / stats.total) * 100);
+
+                        return ` Amount: ${value} (${percentage}%)`;
+                    },
+                },
+            },
+        },
+    };
+}
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
     const s = badgeStyles[status] ?? badgeStyles.pending;
@@ -145,44 +184,8 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
     }, [fetchProjects, sseUrl]);
 
     // Chart Data
-    const statusDistributionData = {
-        labels: ['Pending', 'In Progress', 'Completed'],
-        datasets: [
-            {
-                data: [
-                    stats.pending,
-                    stats.in_progress,
-                    stats.completed,
-                ],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
-                borderColor: '#ffffff',
-                borderWidth: 2,
-            },
-        ],
-    };
-
-    const statusDistributionOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom' as const,
-            },
-            tooltip: {
-                callbacks: {
-                    label: (context: { label?: string; raw?: unknown }) => {
-                        const value = Number(context.raw ?? 0);
-                        const percentage =
-                            stats.total === 0
-                                ? 0
-                                : Math.round((value / stats.total) * 100);
-
-                        return ` Amount: ${value} (${percentage}%)`;
-                    },
-                },
-            },
-        },
-    };
+    const statusDistributionData = createStatusDistributionData(stats);
+    const statusDistributionOptions = createStatusDistributionOptions(stats);
 
     return (
         <section aria-labelledby="project-status-title">
