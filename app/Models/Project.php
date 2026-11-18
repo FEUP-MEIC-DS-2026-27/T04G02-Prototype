@@ -12,6 +12,17 @@ class Project extends Model
     protected $fillable = [
         'name',
         'status',
-        'external_id'
+        'external_id',
+        'milestones',
+        'deadline'
+        
+
     ];
-}
+
+    protected function casts(): array{
+        return [
+            'milestones' => 'array',
+            'deadline' =>'date:Y-m-d'
+
+        ];
+}}

@@ -15,7 +15,14 @@ class ProjectFactory extends Factory
             'name' => fake()->catchPhrase(),
             'status' => fake()->randomElement(['pending', 'in_progress', 'completed']),
             // Prefixed so simulated projects are easy to spot and clean up
-            'external_id' => 'sim-'.fake()->uuid(),
+            'external_id' => 'sim-' . fake()->uuid(),
+            'deadline' => fake()->dateTimeBetween('+1 week', '+2 months')->format('Y-m-d'),
+
+            'milestones' => collect(range(1, fake()->numberBetween(1, 3)))->map(fn () => [
+                'title' => fake()->bs(),
+                'deadline' => fake()->dateTimeBetween('now', '+2 months')->format('Y-m-d'),
+                'status' => fake()->randomElement(['achieved', 'not_achieved']),
+            ])->all(),
         ];
     }
 }

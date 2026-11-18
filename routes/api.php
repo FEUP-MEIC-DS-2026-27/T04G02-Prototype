@@ -5,3 +5,5 @@ use App\Http\Controllers\ProjectController;
 
 Route::get('/projects', [ProjectController::class, 'index']);
 Route::post('/projects/{id}/status', [ProjectController::class, 'updateStatus']);
+Route::post('/projects/{id}/milestones', [ProjectController::class, 'updateMilestones']);
+Route::post('/projects/{id}/deadline', [ProjectController::class, 'updateDeadline']);
