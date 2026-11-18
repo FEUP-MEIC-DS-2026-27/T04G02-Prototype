@@ -4,8 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ARG PUBLIC_PROJECTS_API_URL=http://localhost:8011
-ARG PUBLIC_PROJECTS_SSE_URL=http://localhost:8012/events
+ARG PUBLIC_PROJECTS_API_URL=http://localhost:8340
+ARG PUBLIC_PROJECTS_SSE_URL=http://localhost:8341/events
 RUN npm run build
 
 FROM nginx:1.28-alpine AS runtime

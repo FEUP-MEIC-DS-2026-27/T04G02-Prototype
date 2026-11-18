@@ -72,6 +72,26 @@ class ConsumeProjectEventsTest extends TestCase
         ]);
     }
 
+    public function test_an_external_event_sets_the_programme_and_keeps_it_when_omitted(): void
+    {
+        $this->receive(
+            ['external_id' => 'ext-1', 'name' => 'Funded', 'status' => 'pending', 'programme' => ' Horizon Europe '],
+            ['external_id' => 'ext-1', 'status' => 'completed'],
+        );
+
+        $this->assertDatabaseHas('projects', ['external_id' => 'ext-1', 'programme' => 'Horizon Europe', 'status' => 'completed']);
+    }
+
+    public function test_an_empty_programme_clears_it(): void
+    {
+        $this->receive(
+            ['external_id' => 'ext-1', 'status' => 'pending', 'programme' => 'Portugal 2030'],
+            ['external_id' => 'ext-1', 'status' => 'pending', 'programme' => '  '],
+        );
+
+        $this->assertDatabaseHas('projects', ['external_id' => 'ext-1', 'programme' => null]);
+    }
+
     public function test_an_external_id_never_matches_one_of_our_ids(): void
     {
         $ours = Project::factory()->create(['status' => 'pending', 'external_id' => null]);

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Kafka } = require('kafkajs');
 
-const PORT = Number(process.env.PORT || 8010);
+const PORT = Number(process.env.PORT || 8341);
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'project-status-kafka:29092').split(',');
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3003,http://localhost:3005').split(',');
 
@@ -21,6 +21,8 @@ app.get('/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    res.write(': connected\n\n');
 
     clients.push(res);
 

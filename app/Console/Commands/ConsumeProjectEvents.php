@@ -34,6 +34,9 @@ class ConsumeProjectEvents extends Command
                     $project->fill([
                         'name' => $body['name'] ?? $project->name ?? 'Untitled Project',
                         'status' => $status,
+                        'programme' => isset($body['programme']) && is_string($body['programme'])
+                            ? (trim($body['programme']) ?: null)
+                            : $project->programme,
                     ])->save();
 
                     $this->info(($created ? 'Created' : 'Updated')." project #{$project->id} (external {$project->external_id}) -> {$status}");

@@ -5,7 +5,7 @@ x-api-env: &api-env
   APP_KEY: ${APP_KEY:-}
   APP_ENV: ${APP_ENV:-local}
   APP_DEBUG: ${APP_DEBUG:-true}
-  APP_URL: http://localhost:8011
+  APP_URL: http://localhost:${API_HOST_PORT:-8340}
   DB_HOST: project-status-db
   DB_PORT: 5432
   DB_DATABASE: ${DB_DATABASE:-laravel}
@@ -19,6 +19,10 @@ services:
   project-status-frontend:
     build:
       context: ./frontend
+      # The browser calls the API and SSE hub on the host ports below.
+      args:
+        PUBLIC_PROJECTS_API_URL: http://localhost:${API_HOST_PORT:-8340}
+        PUBLIC_PROJECTS_SSE_URL: http://localhost:${SSE_HOST_PORT:-8341}/events
     ports:
       - "3005:8080"
 
@@ -28,10 +32,10 @@ services:
       context: .
     image: project-status-api
     ports:
-      - "8011:8009"
+      - "${API_HOST_PORT:-8340}:8340"
     environment: *api-env
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8009/up"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8340/up"]
       interval: 10s
       timeout: 3s
       start_period: 30s
@@ -60,9 +64,9 @@ services:
     build:
       context: ./sse-hub
     ports:
-      - "8012:8010"
+      - "${SSE_HOST_PORT:-8341}:8341"
     environment:
-      PORT: 8010
+      PORT: 8341
       KAFKA_BROKERS: project-status-kafka:29092
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
     depends_on:
