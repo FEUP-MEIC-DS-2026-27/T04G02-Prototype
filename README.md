@@ -93,6 +93,18 @@ The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET
 | `project-status-zookeeper` | internal only                       | Used by Kafka                                         |
 | `project-status-db`        | internal only                       | Postgres, data kept in the `project-status-db-data` volume |
 
+### Dashboard props
+
+h.i's VA3 loads the dashboard as the federated module `project_status/Dashboard`. All props are optional:
+
+| Prop      | Default (standalone)              | Inside h.i (through the gateway) |
+|-----------|-----------------------------------|----------------------------------|
+| `apiUrl`  | `http://localhost:8340`           | `''` (same origin)               |
+| `apiPath` | `/api/projects`                   | `/api/project-status`            |
+| `sseUrl`  | `http://localhost:8341/events`    | `/api/project-status/events`     |
+
+Adding an optional prop is compatible. Bump `contractVersion` only when a change would break a host that still passes the old props.
+
 The API and the SSE hub only accept the origins in `CORS_ORIGINS` (default: `localhost:3000`, `3003` and `3005`).
 
 The `projects` table lives in our own database (`project-status-db`), not in VA3's `search-db`. This service backs its own micro-frontend, so it owns its data. Other systems reach it through Kafka events (see below), not through a shared database.
@@ -179,6 +191,7 @@ npm test        # or `npm run test:watch` while developing
 | File                                       | What it covers                                                     |
 |--------------------------------------------|--------------------------------------------------------------------|
 | `tests/ProjectStatusTracker.test.tsx`      | The dashboard against a fake API and SSE hub: loading, status changes, errors, live events, reconnecting, closing the connection on unmount |
+| `tests/ProjectStatusTracker.filters.test.tsx` | Funding programme and project filters (same cases as h.i's browser test), and the `apiPath` prop used behind the h.i gateway |
 | `tests/federation-contract.test.ts`        | What h.i's VA3 relies on: remote name `project_status`, the `./Dashboard` expose, shared React/router versions, `contractVersion`, and `dist/mf-manifest.json` (only after `npm run build`) |
 
 If a federation contract test fails, h.i will break too. Change `packages/config/src/federation.ts` in h.i at the same time, or don't make the change.

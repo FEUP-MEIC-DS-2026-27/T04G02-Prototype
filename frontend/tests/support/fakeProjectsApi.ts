@@ -6,6 +6,7 @@ export interface FakeProject {
   id: number;
   name: string;
   status: Status;
+  programme?: string | null;
 }
 
 const statuses: Status[] = ['pending', 'in_progress', 'completed'];
@@ -18,7 +19,7 @@ function json(body: unknown, status = 200) {
  * An in-memory copy of the Laravel API (routes/api.php), answering fetch() calls
  * with the same response shapes, validation and errors. Replaces global fetch.
  */
-export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[]) {
+export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[], projectsPath = '/api/projects') {
   const projects = initial.map((p) => ({ ...p }));
   const requests: { method: string; url: string; headers: Headers; body: unknown }[] = [];
   let failNextListWith: number | null = null;
@@ -44,7 +45,7 @@ export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[]) 
     if (!url.startsWith(baseUrl)) throw new TypeError(`Failed to fetch ${url}`);
     const path = url.slice(baseUrl.length);
 
-    if (method === 'GET' && path === '/api/projects') {
+    if (method === 'GET' && path === projectsPath) {
       if (failNextListWith !== null) {
         const status = failNextListWith;
         failNextListWith = null;
@@ -53,7 +54,7 @@ export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[]) 
       return json(list());
     }
 
-    const update = path.match(/^\/api\/projects\/(\d+)\/status$/);
+    const update = path.startsWith(`${projectsPath}/`) ? path.slice(projectsPath.length).match(/^\/(\d+)\/status$/) : null;
     if (method === 'POST' && update) {
       if (!statuses.includes(body?.status)) {
         return json({ message: 'The selected status is invalid.', errors: { status: ['The selected status is invalid.'] } }, 422);
