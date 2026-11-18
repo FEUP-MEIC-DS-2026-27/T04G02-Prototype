@@ -11,7 +11,9 @@ permissions:
 jobs:
   publish:
     name: ${{ matrix.image }}
-    runs-on: ubuntu-latest
+    runs-on:
+      group: Default
+      labels: [self-hosted, linux, x64]
     strategy:
       # One image failing must not stop the others from publishing.
       fail-fast: false
