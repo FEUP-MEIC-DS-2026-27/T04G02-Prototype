@@ -90,19 +90,7 @@ export function createStatusDistributionOptions(stats: Stats) {
             legend: {
                 position: 'bottom' as const,
             },
-            tooltip: {
-                callbacks: {
-                    label: (context: { label?: string; raw?: unknown }) => {
-                        const value = Number(context.raw ?? 0);
-                        const percentage =
-                            stats.total === 0
-                                ? 0
-                                : Math.round((value / stats.total) * 100);
-
-                        return ` Amount: ${value} (${percentage}%)`;
-                    },
-                },
-            },
+            tooltip: createTooltip(stats),
         },
     };
 }
@@ -182,13 +170,18 @@ export function createStatusDistributionData(stats: Stats) {
     };
 }
 
+/**
+ * Hover tooltip of the status charts: the status name as the title, then the number of
+ * projects and their share of all (filtered) projects. Chart.js hides it on mouseout.
+ */
 function createTooltip(stats: Stats) {
     return {
         callbacks: {
+            title: (items: { label?: string }[]) => items[0]?.label ?? '',
             label: (context: { label?: string; raw?: unknown }) => {
                 const value = Number(context.raw ?? 0);
                 const percentage = stats.total === 0 ? 0 : Math.round((value / stats.total) * 100);
-                return ` Amount: ${value} (${percentage}%)`;
+                return ` ${value} ${value === 1 ? 'project' : 'projects'} (${percentage}%)`;
             },
         },
     };

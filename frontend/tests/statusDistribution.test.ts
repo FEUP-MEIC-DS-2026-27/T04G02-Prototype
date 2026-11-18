@@ -1,3 +1,4 @@
+import { Chart } from 'chart.js';
 import { describe, expect, it } from 'vitest';
 import {
     createStatusDistributionData,
@@ -27,8 +28,8 @@ describe('status distribution chart', () => {
         const options = createStatusDistributionOptions(stats);
         const label = options.plugins.tooltip.callbacks.label;
 
-        expect(label({ raw: 3 })).toBe(' Amount: 3 (30%)');
-        expect(label({ raw: 5 })).toBe(' Amount: 5 (50%)');
+        expect(label({ raw: 3 })).toBe(' 3 projects (30%)');
+        expect(label({ raw: 5 })).toBe(' 5 projects (50%)');
     });
 
     it('avoids division by zero when there are no projects', () => {
@@ -39,7 +40,7 @@ describe('status distribution chart', () => {
             completed: 0,
         });
 
-        expect(options.plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' Amount: 0 (0%)');
+        expect(options.plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' 0 projects (0%)');
     });
 
 
@@ -67,19 +68,43 @@ describe('status distribution chart', () => {
     ])('%s: tooltip shows the percentage of all projects', (_name, create) => {
         const label = create(stats).plugins.tooltip.callbacks.label;
 
-        expect(label({ raw: 3 })).toBe(' Amount: 3 (30%)');
+        expect(label({ raw: 3 })).toBe(' 3 projects (30%)');
     });
 
     it('rounds the percentage to a whole number', () => {
         const label = createBarOptions({ total: 3, pending: 1, in_progress: 1, completed: 1 })
             .plugins.tooltip.callbacks.label;
 
-        expect(label({ raw: 1 })).toBe(' Amount: 1 (33%)');
-        expect(label({ raw: 2 })).toBe(' Amount: 2 (67%)');
+        expect(label({ raw: 1 })).toBe(' 1 project (33%)');
+        expect(label({ raw: 2 })).toBe(' 2 projects (67%)');
     });
 
     it('treats a missing raw value as zero', () => {
-        expect(createBarOptions(stats).plugins.tooltip.callbacks.label({})).toBe(' Amount: 0 (0%)');
+        expect(createBarOptions(stats).plugins.tooltip.callbacks.label({})).toBe(' 0 projects (0%)');
     });
 });
+
+    describe('hover tooltip', () => {
+        it.each([
+            ['doughnut', createDoughnutOptions],
+            ['bar', createBarOptions],
+        ])('%s: shows the status name, number of projects and percentage', (_name, create) => {
+            const { title, label } = create(stats).plugins.tooltip.callbacks;
+
+            expect(title([{ label: 'In Progress' }])).toBe('In Progress');
+            expect(label({ label: 'In Progress', raw: 3 })).toBe(' 3 projects (30%)');
+        });
+
+        it('has no title when nothing is hovered', () => {
+            expect(createDoughnutOptions(stats).plugins.tooltip.callbacks.title([])).toBe('');
+        });
+
+        it('is dismissed when the pointer leaves the chart', () => {
+            // The charts keep Chart.js's default events, which hide the tooltip on mouseout.
+            for (const options of [createDoughnutOptions(stats), createBarOptions(stats)]) {
+                expect(options).not.toHaveProperty('events');
+            }
+            expect(Chart.defaults.events).toContain('mouseout');
+        });
+    });
 });
