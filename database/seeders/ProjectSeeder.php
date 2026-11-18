@@ -15,6 +15,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'E-Commerce Platform Redesign',
                 'status' => 'completed',
+                'programme' => 'Horizon Europe',
                 'deadline' => '2026-10-15',
                 'milestones' => [
                     ['title' => 'UI/UX Wireframes', 'deadline' => '2026-09-15', 'status' => 'achieved'],
@@ -24,6 +25,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Kafka Microservices Migration',
                 'status' => 'in_progress',
+                'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-10',
                 'milestones' => [
                     ['title' => 'Cluster Setup & Brokers', 'deadline' => '2026-11-01', 'status' => 'achieved'],
@@ -34,6 +36,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Auth Service Refactor',
                 'status' => 'completed',
+                'programme' => 'Horizon 2020',
                 'deadline' => '2026-10-25',
                 'milestones' => [
                     ['title' => 'OAuth2 Token Migration', 'deadline' => '2026-10-01', 'status' => 'achieved'],
@@ -43,6 +46,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Mobile App API Integration',
                 'status' => 'in_progress',
+                'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-15',
                 'milestones' => [
                     ['title' => 'Push Notifications Endpoint', 'deadline' => '2026-11-10', 'status' => 'achieved'],
@@ -52,6 +56,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Analytics Dashboard V2',
                 'status' => 'pending',
+                'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-22',
                 'milestones' => [
                     ['title' => 'Data Aggregation Queries', 'deadline' => '2026-12-01', 'status' => 'not_achieved'],
@@ -61,6 +66,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Database Index Optimization',
                 'status' => 'pending',
+                'programme' => 'Horizon 2020',
                 'deadline' => '2026-11-30',
                 'milestones' => [
                     ['title' => 'Slow Query Profiling', 'deadline' => '2026-11-28', 'status' => 'not_achieved'],
@@ -69,6 +75,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'Payment Gateway Webhooks',
                 'status' => 'in_progress',
+                'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-05',
                 'milestones' => [
                     ['title' => 'Stripe Signature Verification', 'deadline' => '2026-11-12', 'status' => 'achieved'],
@@ -78,6 +85,7 @@ class ProjectSeeder extends Seeder
             [
                 'name' => 'User Onboarding Flow',
                 'status' => 'completed',
+                'programme' => 'Portugal 2030',
                 'deadline' => '2026-10-02',
                 'milestones' => [
                     ['title' => 'Interactive Tutorial Steps', 'deadline' => '2026-09-30', 'status' => 'achieved'],

@@ -64,6 +64,8 @@ docker compose up -d --build
 The API container runs the migrations on start and seeds the sample projects when the table is empty. The consumer waits for the API to be healthy, so the tables always exist before it starts.
 `make up`, `make stop`, `make logs`, `make reset` (drops the database volume) and `make test` (see [Testing](#testing)) wrap the usual commands.
 
+Running next to h.i: both stacks publish ports 8340 and 8341 by default. Start this one on other host ports with `API_HOST_PORT=8350 SSE_HOST_PORT=8351 docker compose up -d --build` (or set them in `.env`). The dashboard is built to call those ports.
+
 A `.env` file is optional: `compose.yaml` has defaults for everything, and `.env.example` lists what you can override.
 Without an `APP_KEY`, the container generates a temporary one on each start. That's fine because the API has no sessions or logins. To pin one, run `docker compose run --rm --no-deps project-status-api php artisan key:generate --show` and put the result in `.env`.
 
@@ -72,7 +74,7 @@ The code is baked into the image (there is no source volume), so rebuild after a
 ### One image, two roles
 
 The root `Dockerfile` builds a single image used by two services:
-- `project-status-api`: the default command (`serve`), php-fpm + nginx on port 8009
+- `project-status-api`: the default command (`serve`), php-fpm + nginx on port 8340
 - `project-status-consumer`: `php artisan kafka:consume-projects`
 
 Both read `DB_*` and `KAFKA_BROKERS` from the environment, and `docker/entrypoint.sh` caches the config from those values on start.
@@ -84,8 +86,8 @@ The consumer group starts from the earliest offset the first time (`KAFKA_OFFSET
 | Service                    | URL / port                          | Purpose                                               |
 |----------------------------|-------------------------------------|-------------------------------------------------------|
 | `project-status-frontend`  | http://localhost:3005               | Dashboard: remote for h.i's VA3, also standalone |
-| `project-status-api`       | http://localhost:8011/api/projects  | Laravel API (nginx + php-fpm)                         |
-| `project-status-sse`       | http://localhost:8012/events        | Reads Kafka and pushes events to the browser over SSE |
+| `project-status-api`       | http://localhost:8340/api/projects  | Laravel API (nginx + php-fpm)                         |
+| `project-status-sse`       | http://localhost:8341/events        | Reads Kafka and pushes events to the browser over SSE |
 | `project-status-consumer`  | -                                   | Runs `php artisan kafka:consume-projects`             |
 | `project-status-kafka`     | internal only (`project-status-kafka:29092`) | Topic `project-status-events`                |
 | `project-status-zookeeper` | internal only                       | Used by Kafka                                         |
@@ -122,7 +124,7 @@ EOF
 ```
 The producer only publishes events; `project-status-consumer` is what creates the projects. You should see:
 - `Created project #N (external sim-1)` lines in `make logs`, followed by `Updated …` when the same `external_id` is sent again
-- the new projects in `GET http://localhost:8011/api/projects`, with their ids assigned by the database
+- the new projects in `GET http://localhost:8340/api/projects`, with their ids assigned by the database
 
 To watch the raw messages on the topic:
 ```shell

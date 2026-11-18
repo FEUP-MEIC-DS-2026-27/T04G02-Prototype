@@ -11,8 +11,8 @@ export const contractVersion = 1;
 
 // The browser calls the project status services directly. The host can pass other
 // URLs as props, and standalone builds can set them at build time.
-const DEFAULT_API_URL: string = import.meta.env.PUBLIC_PROJECTS_API_URL ?? 'http://localhost:8011';
-const DEFAULT_SSE_URL: string = import.meta.env.PUBLIC_PROJECTS_SSE_URL ?? 'http://localhost:8012/events';
+const DEFAULT_API_URL: string = import.meta.env.PUBLIC_PROJECTS_API_URL ?? 'http://localhost:8340';
+const DEFAULT_SSE_URL: string = import.meta.env.PUBLIC_PROJECTS_SSE_URL ?? 'http://localhost:8341/events';
 
 interface ProjectStatusTrackerProps {
     apiUrl?: string;

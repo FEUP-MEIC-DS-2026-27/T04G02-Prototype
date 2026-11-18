@@ -14,6 +14,7 @@ class ProjectFactory extends Factory
         return [
             'name' => fake()->catchPhrase(),
             'status' => fake()->randomElement(['pending', 'in_progress', 'completed']),
+            'programme' => fake()->randomElement(['Horizon Europe', 'Horizon 2020', 'Portugal 2030']),
             // Prefixed so simulated projects are easy to spot and clean up
             'external_id' => 'sim-' . fake()->uuid(),
             'deadline' => fake()->dateTimeBetween('+1 week', '+2 months')->format('Y-m-d'),

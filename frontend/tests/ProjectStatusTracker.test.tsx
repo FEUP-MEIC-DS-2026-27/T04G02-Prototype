@@ -62,12 +62,12 @@ describe('ProjectStatusTracker', () => {
   });
 
   it('falls back to the standalone URLs when no props are given', async () => {
-    const api = installFakeProjectsApi('http://localhost:8011', seed);
+    const api = installFakeProjectsApi('http://localhost:8340', seed);
     renderDashboard({});
 
     await screen.findByRole('cell', { name: 'Alpha' });
-    expect(api.requests[0].url).toBe('http://localhost:8011/api/projects');
-    expect(FakeEventSource.latest().url).toBe('http://localhost:8012/events');
+    expect(api.requests[0].url).toBe('http://localhost:8340/api/projects');
+    expect(FakeEventSource.latest().url).toBe('http://localhost:8341/events');
   });
 
   it('changes a status through the API and shows the result', async () => {
