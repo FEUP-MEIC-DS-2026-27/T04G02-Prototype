@@ -13,6 +13,8 @@ return new class extends Migration
             $table->string('name')->default('Untitled Project');
             $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->timestamps();
+                     $table->date('deadline')->nullable();
+            $table->json('milestones')->nullable();
         });
     }
 

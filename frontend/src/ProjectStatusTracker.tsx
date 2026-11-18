@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
 import Loading from './Loading';
-
+import { milestoneInfo, sortByAlert, type AlertLevel, type Milestone, type MilestoneState, type ProjectAlert } from './projectAlerts';
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 // Part of the contract with VA3: bump this when the props below change incompatibly.
@@ -24,8 +24,9 @@ interface Project {
     id: number;
     name: string;
     status: ProjectStatus;
+    deadline?: string | null;
+    milestones?: Milestone[];
 }
-
 export interface Stats {
     total: number;
     pending: number;
@@ -33,12 +34,22 @@ export interface Stats {
     completed: number;
 }
 
+interface Project {
+    id: number;
+    name: string;
+    status: ProjectStatus;
+    grant_deadline?: string | null;
+    milestones?: Milestone[];
+}
+
 /** A message from the SSE hub (one Kafka event). */
 interface StatusEvent {
     project_id?: number | null;
     external_id?: string;
     name?: string;
-    status: string;
+    status?: string;
+    milestones?: Milestone[];
+    deadline?: string | null;
     timestamp: string;
 }
 
@@ -51,7 +62,13 @@ const chartTypes: { value: ChartType; label: string }[] = [
     { value: 'bar', label: 'Bar' },
 ];
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
-
+const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
+function describeEvent(evt: StatusEvent): string {
+    if (evt.status) return `updated to ${evt.status}`;
+    if (evt.milestones) return 'milestones updated';
+    if ('deadline' in evt) return 'deadline updated';
+    return 'updated';
+}
 const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: string }> = {
     pending: { bg: 'bg-warning-subtle', text: 'text-warning-emphasis', label: 'Pending' },
     in_progress: { bg: 'bg-primary-subtle', text: 'text-primary-emphasis', label: 'In Progress' },
@@ -92,7 +109,51 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
         </span>
     );
 }
+/* const alertStyles: Record<AlertLevel, { bg: string; text: string; label: string; icon: string }> = {
+    red: { bg: 'bg-danger-subtle', text: 'text-danger-emphasis', label: 'Red', icon: '🔴' },
+    yellow: { bg: 'bg-warning-subtle', text: 'text-warning-emphasis', label: 'Yellow', icon: '🟡' },
+    green: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Green', icon: '🟢' },
+}; */
+const alertStyles: Record<AlertLevel, { icon: string }> = {
+    red: {icon: '🔴' },
+    yellow: {icon: '🟡' },
+    green: {  icon: '🟢' },
+};
+/*
+function AlertBadge({ alert }: { alert: ProjectAlert }) {
+    const s = alertStyles[alert.level];
+    return (
+        <div>
+            <span className={`badge ${s.bg} ${s.text} rounded-pill px-3 py-2`}>
+                <span aria-hidden="true">{s.icon}</span> {s.label}
+            </span>
+            {alert.messages.map((m) => (
+                <div key={m} className="small text-secondary mt-1">{m}</div>
+            ))}
+        </div>
+    );
+}*/
+function AlertBadge({ alert }: { alert: ProjectAlert }) {
+    const s = alertStyles[alert.level];
+    return (
+        <span
+            className={`badge rounded-pill px-3 py-2`}
+            title={alert.messages.join('\n') || undefined}
+        >
+            <span aria-hidden="true">{s.icon}</span> 
+        </span>
+    );
+}
+const milestoneStyles: Record<MilestoneState, { bg: string; text: string; label: string }> = {
+    completed: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Achieved' },
+    overdue: { bg: 'bg-danger-subtle', text: 'text-danger-emphasis', label: 'Overdue' },
+    upcoming: { bg: 'bg-secondary-subtle', text: 'text-secondary-emphasis', label: 'Pending' },
+};
 
+const indexedMilestones = (p: Project) =>
+    (p.milestones ?? [])
+        .map((m, index) => ({ m, index }))
+        .sort((a, b) => (a.m.deadline || '9999').localeCompare(b.m.deadline || '9999'));
 /** Throws a readable message when the API answers with an error status. */
 async function readJson<T>(res: Response, what: string): Promise<T> {
     if (!res.ok) {
@@ -158,6 +219,16 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [live, setLive] = useState<LiveState>('connecting');
     const [chartType, setChartType] = useState<ChartType>('bar');
+    const rankedProjects = useMemo(() => sortByAlert(projects), [projects]);
+    const [expanded, setExpanded] = useState<Set<number>>(new Set());
+const [updatingMilestone, setUpdatingMilestone] = useState<string | null>(null);
+
+const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(id)) next.add(id);
+        return next;
+    });
     const fetchProjects = useCallback(async (signal?: AbortSignal) => {
         try {
             const res = await fetch(`${apiUrl}/api/projects`, { signal });
@@ -194,6 +265,26 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
             setUpdatingId(null);
         }
     };
+const handleMilestoneToggle = async (project: Project, index: number, achieved: boolean) => {
+    const key = `${project.id}:${index}`;
+    setUpdatingMilestone(key);
+    setUpdateError(null);
+    try {
+        const milestones = (project.milestones ?? []).map((m, i) =>
+i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved' as const) } : m,        );
+        const res = await fetch(`${apiUrl}/api/projects/${project.id}/milestones`, {
+            method: 'POST', // confirma o verbo e o caminho em routes/api.php
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ milestones }),
+        });
+        await readJson(res, `POST /api/projects/${project.id}/milestones`);
+        await fetchProjects();
+    } catch (err) {
+        setUpdateError(`Could not update milestone of project #${project.id}. ${(err as Error).message}`);
+    } finally {
+        setUpdatingMilestone(null);
+    }
+};
 
     useEffect(() => {
         const controller = new AbortController();
@@ -207,7 +298,6 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
                 const data = JSON.parse(event.data) as StatusEvent;
                 setEvents((prev) => [data, ...prev.slice(0, 4)]); // Keep the 5 latest events
             } catch {
-                // Ignore a malformed event, but still re-sync below.
             }
             fetchProjects(controller.signal); // Re-sync metric state & chart data
         };
@@ -334,11 +424,11 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
                             ) : (
                                 <ul className="list-group list-group-flush">
                                     {events.map((evt, idx) => (
-                                        <li key={idx} className="list-group-item px-0 py-2 small border-bottom">
-                                            ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong> updated to{' '}
-                                            <span className="text-primary fw-semibold">{evt.status}</span>
-                                            <div className="text-secondary mt-1" style={{ fontSize: '0.75rem' }}>{evt.timestamp}</div>
-                                        </li>
+                                      <li key={idx} className="list-group-item px-0 py-2 small border-bottom">
+                                        ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong>{' '}
+                                        <span className="text-primary fw-semibold">{describeEvent(evt)}</span>
+                                        <div className="text-secondary mt-1" style={{ fontSize: '0.75rem' }}>{evt.timestamp}</div>
+                                    </li>
                                     ))}
                                 </ul>
                             )}
@@ -355,33 +445,105 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
                         <table className="table table-hover align-middle mb-0">
                             <thead className="table-light text-secondary">
                                 <tr>
-                                    <th scope="col" className="fw-medium small">ID</th>
+                                     <th scope="col" style={{ width: '2rem' }}><span className="visually-hidden">Milestones</span></th>
+                                        <th scope="col" className="fw-medium small">ID</th>
+                                                                        
+                                  
                                     <th scope="col" className="fw-medium small">Project Name</th>
+                                    <th scope="col" className="fw-medium small">Deadline</th> 
+                                    <th scope="col" className="fw-medium small">Alert</th>  
                                     <th scope="col" className="fw-medium small">Status</th>
                                     <th scope="col" className="fw-medium small">Change Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {projects.map((p) => (
-                                    <tr key={p.id}>
-                                        <td className="text-secondary">#{p.id}</td>
-                                        <td className="fw-medium">{p.name}</td>
-                                        <td><StatusBadge status={p.status} /></td>
-                                        <td>
-                                            <select
-                                                value={p.status}
-                                                onChange={(e) => handleStatusChange(p.id, e.target.value as ProjectStatus)}
-                                                disabled={updatingId === p.id}
-                                                aria-label={`Change status of ${p.name}`}
-                                                className="form-select form-select-sm w-auto"
-                                            >
-                                                <option value="pending">Pending</option>
-                                                <option value="in_progress">In Progress</option>
-                                                <option value="completed">Completed</option>
-                                            </select>
-                                        </td>
+                               {rankedProjects.map(({ project: p, alert }) => {
+    const open = expanded.has(p.id);
+    const milestones = indexedMilestones(p);
+    return (
+        <Fragment key={p.id}>
+            <tr>
+                <td>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0 text-decoration-none"
+                        aria-expanded={open}
+                        aria-controls={`milestones-${p.id}`}
+                        aria-label={`${open ? 'Hide' : 'Show'} milestones of ${p.name}`}
+                        onClick={() => toggleExpanded(p.id)}
+                    >
+                        {open ? '▾' : '▸'}
+                    </button>
+                </td>
+    <td className="text-secondary">#{p.id}</td>
+    <td className="fw-medium">{p.name}</td>
+    <td className="text-nowrap">{formatDeadline(p.deadline)}</td>
+    <td><AlertBadge alert={alert} /></td>
+    <td><StatusBadge status={p.status} /></td>
+    <td>
+        <select
+            value={p.status}
+            onChange={(e) => handleStatusChange(p.id, e.target.value as ProjectStatus)}
+            disabled={updatingId === p.id}
+            aria-label={`Change status of ${p.name}`}
+            className="form-select form-select-sm w-auto"
+        >
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+        </select>
+    </td>
+
+            </tr>
+            {open && (
+                <tr id={`milestones-${p.id}`}>
+                    <td colSpan={7} className="bg-body-tertiary">
+                        {milestones.length === 0 ? (
+                            <p className="text-secondary small mb-0">No milestones for this project.</p>
+                        ) : (
+                            <table className="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr className="small text-secondary">
+                                        <th scope="col">Milestone</th>
+                                        <th scope="col">Due</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Time</th>
+                                        <th scope="col">Achieved</th>
                                     </tr>
-                                ))}
+                                </thead>
+                                <tbody>
+                                    {milestones.map(({ m, index }) => {
+                                        const info = milestoneInfo(m);
+                                        const s = milestoneStyles[info.state];
+                                        const key = `${p.id}:${index}`;
+                                        return (
+                                            <tr key={index}>
+                                                <td className="fw-medium">{m.title}</td>
+                                                <td className="text-nowrap">{formatDeadline(m.deadline)}</td>
+                                                <td><span className={`badge ${s.bg} ${s.text} rounded-pill`}>{s.label}</span></td>
+                                                <td className={info.state === 'overdue' ? 'text-danger' : 'text-secondary'}>{info.timeLabel}</td>
+                                                <td>
+                                                  <input
+    type="checkbox"
+    className="form-check-input"
+    checked={m.status === 'achieved'}
+    disabled={updatingMilestone === key}
+    aria-label={`Mark ${m.title} as achieved`}
+    onChange={(e) => handleMilestoneToggle(p, index, e.target.checked)}
+/>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </td>
+                </tr>
+            )}
+        </Fragment>
+    );
+})}
                             </tbody>
                         </table>
                     </div>
