@@ -42,6 +42,7 @@ class ProjectController extends Controller
         );
 
         Kafka::publish(config('kafka.brokers'))
+            ->withConfigOptions(['compression.codec' => 'none'])
             ->onTopic('project-status-events')
             ->withMessage($message)
             ->send();
@@ -62,8 +63,7 @@ class ProjectController extends Controller
 ]);
 
         $project = Project::findOrFail($id);
-        $project->update(['milestones' => $validated['milestones']]);
-
+        $project->update(['milestones' => $validated['milestones'] ?? []]);
         // Opcional: publica evento no Kafka tal como no updateStatus
         $message = new Message(
             body: [
@@ -75,6 +75,7 @@ class ProjectController extends Controller
         );
 
         Kafka::publish(config('kafka.brokers'))
+            ->withConfigOptions(['compression.codec' => 'none'])
             ->onTopic('project-status-events')
             ->withMessage($message)
             ->send();
@@ -92,7 +93,16 @@ class ProjectController extends Controller
 
         $project = Project::findOrFail($id);
         $project->update(['deadline' => $validated['deadline']]);
+        $message = new Message(
+            body: [
+                'project_id' => (int) $project->id,
+                'name'       => $project->name,
+                'deadline'   => $project->deadline,
+                'timestamp'  => now()->toIso8601String(),
+            ]
+        );
         Kafka::publish(config('kafka.brokers'))
+            ->withConfigOptions(['compression.codec' => 'none'])
             ->onTopic('project-status-events')
             ->withMessage($message)
             ->send();

@@ -47,7 +47,9 @@ interface StatusEvent {
     project_id?: number | null;
     external_id?: string;
     name?: string;
-    status: string;
+    status?: string;
+    milestones?: Milestone[];
+    deadline?: string | null;
     timestamp: string;
 }
 
@@ -61,7 +63,12 @@ const chartTypes: { value: ChartType; label: string }[] = [
 ];
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
-
+function describeEvent(evt: StatusEvent): string {
+    if (evt.status) return `updated to ${evt.status}`;
+    if (evt.milestones) return 'milestones updated';
+    if ('deadline' in evt) return 'deadline updated';
+    return 'updated';
+}
 const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: string }> = {
     pending: { bg: 'bg-warning-subtle', text: 'text-warning-emphasis', label: 'Pending' },
     in_progress: { bg: 'bg-primary-subtle', text: 'text-primary-emphasis', label: 'In Progress' },
@@ -291,7 +298,6 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 const data = JSON.parse(event.data) as StatusEvent;
                 setEvents((prev) => [data, ...prev.slice(0, 4)]); // Keep the 5 latest events
             } catch {
-                // Ignore a malformed event, but still re-sync below.
             }
             fetchProjects(controller.signal); // Re-sync metric state & chart data
         };
@@ -418,11 +424,11 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                             ) : (
                                 <ul className="list-group list-group-flush">
                                     {events.map((evt, idx) => (
-                                        <li key={idx} className="list-group-item px-0 py-2 small border-bottom">
-                                            ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong> updated to{' '}
-                                            <span className="text-primary fw-semibold">{evt.status}</span>
-                                            <div className="text-secondary mt-1" style={{ fontSize: '0.75rem' }}>{evt.timestamp}</div>
-                                        </li>
+                                      <li key={idx} className="list-group-item px-0 py-2 small border-bottom">
+                                        ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong>{' '}
+                                        <span className="text-primary fw-semibold">{describeEvent(evt)}</span>
+                                        <div className="text-secondary mt-1" style={{ fontSize: '0.75rem' }}>{evt.timestamp}</div>
+                                    </li>
                                     ))}
                                 </ul>
                             )}
