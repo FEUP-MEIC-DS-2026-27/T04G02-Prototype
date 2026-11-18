@@ -45,7 +45,7 @@ describe('ProjectStatusTracker', () => {
     installFakeProjectsApi(API, seed);
     renderDashboard();
 
-    expect(screen.getByRole('status')).toHaveTextContent('Loading projects…');
+    expect(screen.getByText('Loading projects…').closest('[role="status"]')).not.toBeNull();
 
     expect(await screen.findByRole('cell', { name: 'Alpha' })).toBeInTheDocument();
     expect(screen.queryByText('Loading projects…')).not.toBeInTheDocument();

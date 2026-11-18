@@ -15,7 +15,10 @@ const DEFAULT_API_URL: string = import.meta.env.PUBLIC_PROJECTS_API_URL ?? 'http
 const DEFAULT_SSE_URL: string = import.meta.env.PUBLIC_PROJECTS_SSE_URL ?? 'http://localhost:8341/events';
 
 interface ProjectStatusTrackerProps {
+    /** Origin of the project status API ('' for the same origin as the page). */
     apiUrl?: string;
+    /** Path of the projects resource on that origin. Through the h.i gateway it is /api/project-status. */
+    apiPath?: string;
     sseUrl?: string;
 }
 
@@ -24,6 +27,7 @@ interface Project {
     id: number;
     name: string;
     status: ProjectStatus;
+    programme?: string | null;
     deadline?: string | null;
     milestones?: Milestone[];
 }
@@ -63,6 +67,8 @@ const chartTypes: { value: ChartType; label: string }[] = [
 ];
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
+const UNASSIGNED = '__unassigned__';
+const programmeName = (p: Project) => p.programme?.trim() || '';
 function describeEvent(evt: StatusEvent): string {
     if (evt.status) return `updated to ${evt.status}`;
     if (evt.milestones) return 'milestones updated';
@@ -209,9 +215,11 @@ export function createBarOptions(stats: Stats) {
 
 // Bootstrap classes only. The stylesheet comes from the host (integrated) or from
 // bootstrap.tsx (standalone), and the host owns the router.
-export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl = DEFAULT_SSE_URL }: ProjectStatusTrackerProps) {
+export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, apiPath = '/api/projects', sseUrl = DEFAULT_SSE_URL }: ProjectStatusTrackerProps) {
+    const projectsUrl = `${apiUrl}${apiPath}`;
     const [projects, setProjects] = useState<Project[]>([]);
-    const [stats, setStats] = useState<Stats>(emptyStats);
+    const [programme, setProgramme] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState('');
     const [events, setEvents] = useState<StatusEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -219,7 +227,17 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, sseUrl 
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [live, setLive] = useState<LiveState>('connecting');
     const [chartType, setChartType] = useState<ChartType>('bar');
-    const rankedProjects = useMemo(() => sortByAlert(projects), [projects]);
+    const programmes = useMemo(() => [...new Set(projects.map(programmeName).filter(Boolean))].sort(), [projects]);
+    const filteredProjects = useMemo(() => projects.filter((p) =>
+        (!programme || (programme === UNASSIGNED ? !programmeName(p) : programmeName(p) === programme))
+        && (!selectedProjectId || String(p.id) === selectedProjectId)), [projects, programme, selectedProjectId]);
+    // Totals follow the filters, so they are counted here rather than taken from the API's stats.
+    const stats = useMemo(() => filteredProjects.reduce<Stats>((result, p) => {
+        result.total += 1;
+        if (p.status in badgeStyles) result[p.status] += 1;
+        return result;
+    }, { ...emptyStats }), [filteredProjects]);
+    const rankedProjects = useMemo(() => sortByAlert(filteredProjects), [filteredProjects]);
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
 const [updatingMilestone, setUpdatingMilestone] = useState<string | null>(null);
 
@@ -231,10 +249,9 @@ const toggleExpanded = (id: number) =>
     });
     const fetchProjects = useCallback(async (signal?: AbortSignal) => {
         try {
-            const res = await fetch(`${apiUrl}/api/projects`, { signal });
-            const data = await readJson<{ projects?: Project[]; stats?: Stats }>(res, 'GET /api/projects');
+            const res = await fetch(projectsUrl, { signal });
+            const data = await readJson<{ projects?: Project[] }>(res, `GET ${apiPath}`);
             setProjects(data.projects ?? []);
-            setStats(data.stats ?? emptyStats);
             setLoadError(null);
         } catch (err) {
             if ((err as Error).name === 'AbortError') return;
@@ -242,13 +259,13 @@ const toggleExpanded = (id: number) =>
         } finally {
             if (!signal?.aborted) setLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, apiPath, projectsUrl]);
 
     const handleStatusChange = async (id: number, newStatus: ProjectStatus) => {
         setUpdatingId(id);
         setUpdateError(null);
         try {
-            const res = await fetch(`${apiUrl}/api/projects/${id}/status`, {
+            const res = await fetch(`${projectsUrl}/${id}/status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -256,7 +273,7 @@ const toggleExpanded = (id: number) =>
                 },
                 body: JSON.stringify({ status: newStatus }),
             });
-            await readJson(res, `POST /api/projects/${id}/status`);
+            await readJson(res, `POST ${apiPath}/${id}/status`);
             // Refresh now instead of waiting for the SSE event, so the page is right even if live updates are down.
             await fetchProjects();
         } catch (err) {
@@ -272,12 +289,12 @@ const handleMilestoneToggle = async (project: Project, index: number, achieved: 
     try {
         const milestones = (project.milestones ?? []).map((m, i) =>
 i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved' as const) } : m,        );
-        const res = await fetch(`${apiUrl}/api/projects/${project.id}/milestones`, {
+        const res = await fetch(`${projectsUrl}/${project.id}/milestones`, {
             method: 'POST', // confirma o verbo e o caminho em routes/api.php
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ milestones }),
         });
-        await readJson(res, `POST /api/projects/${project.id}/milestones`);
+        await readJson(res, `POST ${apiPath}/${project.id}/milestones`);
         await fetchProjects();
     } catch (err) {
         setUpdateError(`Could not update milestone of project #${project.id}. ${(err as Error).message}`);
@@ -309,6 +326,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
         };
     }, [fetchProjects, sseUrl]);
 
+    const filtering = programme !== '' || selectedProjectId !== '';
+    const filteredIds = new Set(filteredProjects.map((p) => p.id));
+    const visibleEvents = filtering
+        ? events.filter((evt) => evt.project_id != null && filteredIds.has(evt.project_id))
+        : events;
+
     // Chart Data
     const statusDistributionData = createStatusDistributionData(stats);
     const doughnutOptions = createDoughnutOptions(stats);
@@ -325,6 +348,40 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                     Live overview of project execution and status changes.
                 </p>
             </header>
+
+            <div className="card mb-4">
+                <div className="card-body">
+                    <div className="row g-3 align-items-end">
+                        <div className="col-12 col-md-6 col-xl-3">
+                            <label htmlFor="project-programme" className="form-label">Funding programme</label>
+                            <select id="project-programme" className="form-select" value={programme}
+                                onChange={(e) => setProgramme(e.target.value)} disabled={loading}>
+                                <option value="">All programmes</option>
+                                {programmes.map((name) => <option key={name} value={name}>{name}</option>)}
+                                <option value={UNASSIGNED}>Unassigned</option>
+                            </select>
+                        </div>
+                        <div className="col-12 col-md-6 col-xl-3">
+                            <label htmlFor="project-filter" className="form-label">Project</label>
+                            <select id="project-filter" className="form-select" value={selectedProjectId}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
+                                disabled={loading || projects.length === 0}>
+                                <option value="">All projects</option>
+                                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="col-auto">
+                            <button type="button" className="btn btn-outline-secondary"
+                                onClick={() => { setProgramme(''); setSelectedProjectId(''); }}>
+                                Clear filters
+                            </button>
+                        </div>
+                    </div>
+                    <p className="small text-secondary mt-3 mb-0" role="status">
+                        Showing {filteredProjects.length} of {projects.length} projects.
+                    </p>
+                </div>
+            </div>
 
             {loading && <Loading message="Loading projects…" />}
             {loadError && (
@@ -401,7 +458,9 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 </div>
                             </div>
                             <div className="d-flex justify-content-center" style={{ height: '220px' }}>
-                                {chartType === 'bar' ? (
+                                {stats.total === 0 && !loading ? (
+                                    <p className="text-secondary">No projects match these filters.</p>
+                                ) : chartType === 'bar' ? (
                                     <Bar data={statusDistributionData} options={barOptions} />
                                 ) : (
                                     <Doughnut data={statusDistributionData} options={doughnutOptions} />
@@ -419,11 +478,11 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                     <div className="card h-100">
                         <div className="card-body">
                             <h3 className="h5 mb-3">Recent SSE Events</h3>
-                            {events.length === 0 ? (
+                            {visibleEvents.length === 0 ? (
                                 <p className="text-secondary small">Listening for live events from Kafka...</p>
                             ) : (
                                 <ul className="list-group list-group-flush">
-                                    {events.map((evt, idx) => (
+                                    {visibleEvents.map((evt, idx) => (
                                       <li key={idx} className="list-group-item px-0 py-2 small border-bottom">
                                         ⚡ Project <strong>{evt.project_id != null ? `#${evt.project_id}` : evt.external_id}</strong>{' '}
                                         <span className="text-primary fw-semibold">{describeEvent(evt)}</span>
@@ -450,6 +509,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                                                         
                                   
                                     <th scope="col" className="fw-medium small">Project Name</th>
+                                    <th scope="col" className="fw-medium small">Programme</th>
                                     <th scope="col" className="fw-medium small">Deadline</th> 
                                     <th scope="col" className="fw-medium small">Alert</th>  
                                     <th scope="col" className="fw-medium small">Status</th>
@@ -477,6 +537,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 </td>
     <td className="text-secondary">#{p.id}</td>
     <td className="fw-medium">{p.name}</td>
+    <td>{programmeName(p) || 'Unassigned'}</td>
     <td className="text-nowrap">{formatDeadline(p.deadline)}</td>
     <td><AlertBadge alert={alert} /></td>
     <td><StatusBadge status={p.status} /></td>
@@ -497,7 +558,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             </tr>
             {open && (
                 <tr id={`milestones-${p.id}`}>
-                    <td colSpan={7} className="bg-body-tertiary">
+                    <td colSpan={8} className="bg-body-tertiary">
                         {milestones.length === 0 ? (
                             <p className="text-secondary small mb-0">No milestones for this project.</p>
                         ) : (
@@ -544,6 +605,11 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
         </Fragment>
     );
 })}
+                                {!loading && filteredProjects.length === 0 && (
+                                    <tr>
+                                        <td colSpan={8} className="text-secondary text-center">No projects match these filters.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
