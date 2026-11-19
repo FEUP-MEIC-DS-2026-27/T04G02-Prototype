@@ -23,8 +23,8 @@ const API = 'http://api.test';
 const SSE = 'http://sse.test/events';
 
 const seed: FakeProject[] = [
-  { id: 1, name: 'Alpha', status: 'pending' },
-  { id: 2, name: 'Beta', status: 'in_progress' },
+  { id: 1, name: 'Alpha', status: 'planned' },
+  { id: 2, name: 'Beta', status: 'active' },
   { id: 3, name: 'Gamma', status: 'completed' },
 ];
 
@@ -52,12 +52,14 @@ describe('ProjectStatusTracker', () => {
     expect(screen.getAllByRole('row')).toHaveLength(4); // header + 3 projects
 
     expect(statCard('Total Projects')).toHaveTextContent('3');
-    expect(statCard('Pending')).toHaveTextContent('1');
-    expect(statCard('In Progress')).toHaveTextContent('1');
+    expect(statCard('Planned')).toHaveTextContent('1');
+    expect(statCard('Active')).toHaveTextContent('1');
+    expect(statCard('On Hold')).toHaveTextContent('0');
     expect(statCard('Completed')).toHaveTextContent('1');
-    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,1');
+    expect(statCard('Cancelled')).toHaveTextContent('0');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,0,1,0');
 
-    expect(within(row('Beta')).getByText('In Progress', { selector: '.badge' })).toBeInTheDocument();
+    expect(within(row('Beta')).getByText('Active', { selector: '.badge' })).toBeInTheDocument();
     expect(FakeEventSource.latest().url).toBe(SSE);
   });
 
@@ -79,9 +81,9 @@ describe('ProjectStatusTracker', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Change status of Alpha' }), 'completed');
 
     await waitFor(() => expect(statCard('Completed')).toHaveTextContent('2'));
-    expect(statCard('Pending')).toHaveTextContent('0');
+    expect(statCard('Planned')).toHaveTextContent('0');
     expect(within(row('Alpha')).getByText('Completed', { selector: '.badge' })).toBeInTheDocument();
-    expect(screen.getByTestId('status-chart')).toHaveTextContent('0,1,2');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('0,1,0,2,0');
 
     const post = api.requests.find((r) => r.method === 'POST')!;
     expect(post.url).toBe(`${API}/api/projects/1/status`);
@@ -93,7 +95,7 @@ describe('ProjectStatusTracker', () => {
 
   it('shows the API error when a status change fails, and recovers on the next one', async () => {
     const user = userEvent.setup();
-    installFakeProjectsApi(API, [{ id: 1, name: 'Alpha', status: 'pending' }]);
+    installFakeProjectsApi(API, [{ id: 1, name: 'Alpha', status: 'planned' }]);
     renderDashboard();
     await screen.findByRole('cell', { name: 'Alpha' });
 
@@ -106,9 +108,29 @@ describe('ProjectStatusTracker', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not update project #1. No query results for model');
     expect(screen.getByRole('combobox', { name: 'Change status of Alpha' })).toBeEnabled();
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Change status of Alpha' }), 'in_progress');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Change status of Alpha' }), 'active');
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-    expect(statCard('In Progress')).toHaveTextContent('1');
+    expect(statCard('Active')).toHaveTextContent('1');
+  });
+
+  it('offers the five statuses and shows on hold and cancelled projects', async () => {
+    const user = userEvent.setup();
+    installFakeProjectsApi(API, seed);
+    renderDashboard();
+    await screen.findByRole('cell', { name: 'Alpha' });
+
+    const select = screen.getByRole('combobox', { name: 'Change status of Alpha' });
+    expect(within(select).getAllByRole('option').map((o) => o.textContent))
+      .toEqual(['Planned', 'Active', 'On Hold', 'Completed', 'Cancelled']);
+
+    await user.selectOptions(select, 'on_hold');
+    await waitFor(() => expect(statCard('On Hold')).toHaveTextContent('1'));
+    expect(within(row('Alpha')).getByText('On Hold', { selector: '.badge' })).toHaveClass('bg-warning-subtle');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Change status of Beta' }), 'cancelled');
+    await waitFor(() => expect(statCard('Cancelled')).toHaveTextContent('1'));
+    expect(within(row('Beta')).getByText('Cancelled', { selector: '.badge' })).toHaveClass('bg-danger-subtle');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('0,0,1,1,1');
   });
 
   it('shows an error when the API cannot be reached', async () => {
@@ -153,7 +175,7 @@ describe('ProjectStatusTracker', () => {
 
     act(() => {
       for (let i = 1; i <= 7; i++) {
-        FakeEventSource.latest().emit({ external_id: `ext-${i}`, status: 'pending', timestamp: `t${i}` });
+        FakeEventSource.latest().emit({ external_id: `ext-${i}`, status: 'planned', timestamp: `t${i}` });
       }
     });
 
@@ -234,15 +256,15 @@ describe('ProjectStatusTracker', () => {
     await user.click(screen.getByRole('button', { name: 'Donut' }));
     expect(screen.getByRole('button', { name: 'Donut' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('status-chart')).toHaveAttribute('data-chart-type', 'doughnut');
-    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,1');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,0,1,0');
 
     await user.click(screen.getByRole('button', { name: 'Bar' }));
     expect(screen.getByTestId('status-chart')).toHaveAttribute('data-chart-type', 'bar');
-    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,1');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,0,1,0');
   });
   it('builds chart data from stats and a percentage tooltip', () => {
-  const stats = { total: 4, pending: 1, in_progress: 1, completed: 2 };
-  expect(createStatusDistributionData(stats).datasets[0].data).toEqual([1, 1, 2]);
+  const stats = { total: 4, planned: 1, active: 1, on_hold: 0, completed: 2, cancelled: 0 };
+  expect(createStatusDistributionData(stats).datasets[0].data).toEqual([1, 1, 0, 2, 0]);
 
   const label = createBarOptions(stats).plugins.tooltip.callbacks.label;
   expect(label({ raw: 2 })).toBe(' 2 projects (50%)');
@@ -250,7 +272,7 @@ describe('ProjectStatusTracker', () => {
 });
 
 it('does not divide by zero when there are no projects', () => {
-  const empty = { total: 0, pending: 0, in_progress: 0, completed: 0 };
+  const empty = { total: 0, planned: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 };
   expect(createBarOptions(empty).plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' 0 projects (0%)');
 });
 });

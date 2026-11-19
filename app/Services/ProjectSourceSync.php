@@ -6,17 +6,9 @@ use App\Models\Project;
 use Junges\Kafka\Facades\Kafka;
 use Junges\Kafka\Message\Message;
 
-/**
- * Applies projects from h.i's projects-service to this app's `projects` table.
- *
- * A source project is matched on `external_id` (its id, e.g. `INE-25-0001`), so it
- * never collides with the ids of the sample projects.
- */
+// Keeps the projects table in sync with projects-service, matching on external_id
 class ProjectSourceSync
 {
-    /**
-     * This app's status for a projects-service status, or null when it has no mapping.
-     */
     public function mapStatus(mixed $sourceStatus): ?string
     {
         if (! is_string($sourceStatus)) {
@@ -26,10 +18,7 @@ class ProjectSourceSync
         return config('project_source.status_map')[$sourceStatus] ?? null;
     }
 
-    /**
-     * Creates or updates the project. Returns null when the payload can't be used
-     * (no id, or a status without a mapping), leaving the table untouched.
-     */
+    // Returns null (and changes nothing) when there's no id or the status is unknown
     public function upsert(array $source): ?Project
     {
         $externalId = $source['id'] ?? null;
@@ -51,18 +40,12 @@ class ProjectSourceSync
         return $project;
     }
 
-    /**
-     * Deletes the project with this source id. Returns whether one existed.
-     */
     public function delete(string $externalId): bool
     {
         return Project::where('external_id', $externalId)->delete() > 0;
     }
 
-    /**
-     * Publishes the change on this app's own topic, so the SSE hub pushes it to the
-     * dashboard. Same shape as the events published by ProjectController.
-     */
+    // Republish on our topic so the SSE hub refreshes the dashboard
     public function publish(?Project $project, string $externalId, bool $deleted = false): void
     {
         $message = new Message(

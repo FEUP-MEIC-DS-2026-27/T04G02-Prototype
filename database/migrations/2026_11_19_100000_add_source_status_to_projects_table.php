@@ -4,10 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Status as projects-service reports it (`Planned`, `On Hold`, ...), kept next to
- * the mapped `status` so no information is lost while the status set differs.
- */
+// Original status from projects-service ('Planned', 'On Hold', ...)
 return new class extends Migration
 {
     public function up(): void

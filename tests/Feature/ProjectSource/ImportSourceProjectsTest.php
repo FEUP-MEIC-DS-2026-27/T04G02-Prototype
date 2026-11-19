@@ -7,10 +7,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-/**
- * projects:import loads the projects from h.i's projects-service (faked here) into
- * the projects table, matched on external_id.
- */
 class ImportSourceProjectsTest extends TestCase
 {
     use RefreshDatabase;
@@ -50,15 +46,15 @@ class ImportSourceProjectsTest extends TestCase
         $this->assertDatabaseHas('projects', [
             'external_id' => 'INE-25-0001',
             'name' => 'Renewable Energy Integration - Porto #01',
-            'status' => 'in_progress',
+            'status' => 'active',
             'source_status' => 'Active',
         ]);
         $this->assertSame('2025-03-09', Project::where('external_id', 'INE-25-0001')->first()->deadline->format('Y-m-d'));
-        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0002', 'source_status' => 'On Hold']);
-        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0003', 'status' => 'pending']);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0002', 'status' => 'on_hold', 'source_status' => 'On Hold']);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0003', 'status' => 'planned']);
     }
 
-    public function test_every_source_status_has_a_mapping(): void
+    public function test_each_source_status_gets_its_own_status(): void
     {
         $statuses = ['Planned', 'Active', 'On Hold', 'Completed', 'Cancelled'];
 
@@ -70,8 +66,7 @@ class ImportSourceProjectsTest extends TestCase
 
         $this->artisan('projects:import')->assertSuccessful();
 
-        $this->assertDatabaseCount('projects', count($statuses));
-        $this->assertSame(0, Project::whereNotIn('status', ['pending', 'in_progress', 'completed'])->count());
+        $this->assertSame(Project::STATUSES, Project::orderBy('external_id')->pluck('status')->all());
     }
 
     public function test_importing_again_updates_instead_of_duplicating(): void

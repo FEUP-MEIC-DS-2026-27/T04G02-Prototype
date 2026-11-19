@@ -21,8 +21,7 @@ php artisan route:cache
 if [ "${1:-}" = "serve" ] && [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force
 
-    # With h.i's projects-service configured, load the real projects instead of the samples.
-    # If it can't be reached, keep going: the API still starts, with the samples on an empty table.
+    # Import the real projects from h.i (a failure doesn't stop the API)
     if [ -n "${PROJECTS_SOURCE_API_URL:-}" ]; then
         php artisan projects:import --without-samples \
             || echo "entrypoint: could not import from ${PROJECTS_SOURCE_API_URL}, see the error above" >&2

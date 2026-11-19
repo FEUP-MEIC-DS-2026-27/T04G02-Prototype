@@ -20,14 +20,14 @@ class ConsumeProjectEvents extends Command
             ->withHandler(function (ConsumerMessage $message) {
                 $body = $message->getBody();
 
-                // Already applied by kafka:consume-source-projects, which publishes them for the SSE hub
+                // Already saved by kafka:consume-source-projects
                 if (($body['source'] ?? null) === 'projects-service') {
                     return;
                 }
 
                 $status = $body['status'] ?? null;
 
-                if (! in_array($status, ['pending', 'in_progress', 'completed'], true)) {
+                if (! in_array($status, Project::STATUSES, true)) {
                     $this->warn('Skipping invalid event: '.json_encode($body));
                     return;
                 }

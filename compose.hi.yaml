@@ -1,11 +1,6 @@
-# Runs this stack on h.i's real project data instead of the sample projects.
-# Start h.i first (its `federation-value-areas` stack), then:
+# Uses h.i's real projects. Start h.i first, then:
 #   docker compose -f compose.yaml -f compose.hi.yaml up -d --build
-# h.i also publishes ports 8340/8341, so set API_HOST_PORT/SSE_HOST_PORT (e.g. 8350/8351) in .env.
-#
-# h.i runs its own copy of this service, so `project-status-db` and `project-status-kafka`
-# also exist on h.i's network. Our database and broker get unique aliases here, so the
-# containers that join h.i's network never reach h.i's copies by mistake.
+# h.i has its own project-status-db/kafka on its network, hence the unique aliases below.
 
 x-own-env: &own-env
   DB_HOST: t04g02-db
@@ -28,7 +23,6 @@ services:
     environment:
       KAFKA_BROKERS: t04g02-kafka:29092
 
-  # Follows projects-service's `projects` topic (created / updated / deleted)
   project-status-source-consumer:
     image: project-status-api
     pull_policy: never
