@@ -3,6 +3,7 @@ import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, T
 import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
 import Loading from './Loading';
+import { summariseMemberProgress } from './memberProgress';
 import { milestoneInfo, sortByAlert, type AlertLevel, type Milestone, type MilestoneState, type ProjectAlert } from './projectAlerts';
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -513,6 +514,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                {rankedProjects.map(({ project: p, alert }) => {
     const open = expanded.has(p.id);
     const milestones = indexedMilestones(p);
+    const team = summariseMemberProgress(p.milestones ?? []);
     return (
         <Fragment key={p.id}>
             <tr>
@@ -555,10 +557,42 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                         {milestones.length === 0 ? (
                             <p className="text-secondary small mb-0">No milestones for this project.</p>
                         ) : (
+                            <>
+                            {team.length > 0 && (
+                                <div className="mb-3" role="group" aria-label={`Team progress of ${p.name}`}>
+                                    <h4 className="h6 mb-2">Team progress</h4>
+                                    <ul className="list-unstyled row row-cols-1 row-cols-md-2 g-2 mb-0">
+                                        {team.map((member) => {
+                                            const label = member.name ?? 'Unassigned';
+                                            const percent = Math.round((member.achieved / member.total) * 100);
+                                            return (
+                                                <li key={member.name ?? UNASSIGNED} className="col">
+                                                    <div className="d-flex justify-content-between small">
+                                                        <span className="fw-medium">{label}</span>
+                                                        <span className="text-secondary">{`${member.achieved} of ${member.total} achieved`}</span>
+                                                    </div>
+                                                    <div
+                                                        className="progress"
+                                                        role="progressbar"
+                                                        aria-label={`Progress of ${label}`}
+                                                        aria-valuenow={percent}
+                                                        aria-valuemin={0}
+                                                        aria-valuemax={100}
+                                                        style={{ height: '6px' }}
+                                                    >
+                                                        <div className="progress-bar bg-success" style={{ width: `${percent}%` }} />
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
                             <table className="table table-sm align-middle mb-0">
                                 <thead>
                                     <tr className="small text-secondary">
                                         <th scope="col">Milestone</th>
+                                        <th scope="col">Responsible</th>
                                         <th scope="col">Due</th>
                                         <th scope="col">Status</th>
                                         <th scope="col">Time</th>
@@ -573,6 +607,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                         return (
                                             <tr key={index}>
                                                 <td className="fw-medium">{m.title}</td>
+                                                <td>{m.assignee?.trim() || <span className="text-secondary">—</span>}</td>
                                                 <td className="text-nowrap">{formatDeadline(m.deadline)}</td>
                                                 <td><span className={`badge ${s.bg} ${s.text} rounded-pill`}>{s.label}</span></td>
                                                 <td className={info.state === 'overdue' ? 'text-danger' : 'text-secondary'}>{info.timeLabel}</td>
@@ -591,6 +626,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                     })}
                                 </tbody>
                             </table>
+                            </>
                         )}
                     </td>
                 </tr>
