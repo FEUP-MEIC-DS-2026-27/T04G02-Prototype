@@ -151,6 +151,45 @@ Or reset everything to the sample projects with `make reset` (this also deletes 
 
 > **`php artisan kafka:simulate-projects` doesn't work in the Docker image.** It builds fake projects with `ProjectFactory`, which needs Faker. Faker is a dev dependency, and the image is built with `composer install --no-dev` so test tools stay out of production. For the same reason, `migrate:fresh --seed` fails in the container, because `DatabaseSeeder` also uses a factory.
 
+## Real project data from h.i
+
+The sample projects are only used when nothing else is configured. With h.i running, the projects come from VA3's `projects-service`, which owns them:
+
+```shell
+# start h.i's federation-value-areas stack first, then from this repository:
+docker compose -f compose.yaml -f compose.hi.yaml up -d --build
+```
+`compose.hi.yaml` joins h.i's Docker network and:
+- has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`). If the import fails, the API still starts with what the table already has.
+- adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live.
+
+Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`.
+
+| Variable                         | Default    | Meaning                                                   |
+|----------------------------------|------------|-----------------------------------------------------------|
+| `PROJECTS_SOURCE_API_URL`        | (empty)    | projects-service base URL. Empty = no import              |
+| `PROJECTS_SOURCE_KAFKA_BROKERS`  | (empty)    | Broker with the `projects` topic. Empty = consumer exits  |
+| `PROJECTS_SOURCE_TOPIC`          | `projects` | Topic to follow                                           |
+
+### Statuses
+
+projects-service has five statuses; the dashboard has three. `config/project_source.php` maps them, and the original one is stored in `source_status`:
+
+| projects-service | `status`      |
+|------------------|---------------|
+| Planned          | `pending`     |
+| Active           | `in_progress` |
+| On Hold          | `in_progress` (provisional) |
+| Completed        | `completed`   |
+| Cancelled        | `completed` (provisional)   |
+
+A status missing from the map is skipped with a warning.
+
+### Known limitations
+
+- In h.i's development stack, `post-events-service` generates simulated changes on the topic only; the projects-service API keeps the original data. Restarting `project-status-api` re-imports that original data, and the dashboard catches up as new events arrive.
+- projects-service owns the status, so a status changed from the dashboard is overwritten by the next event for that project.
+
 ## Testing
 
 ### Backend (Laravel)
@@ -176,7 +215,8 @@ To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
 | Folder                  | What it covers                                                               |
 |-------------------------|------------------------------------------------------------------------------|
 | `tests/Feature/Api`     | `GET /api/projects`, `POST /api/projects/{id}/status` (incl. the Kafka event it publishes), CORS for the h.i origins |
-| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events |
+| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing |
+| `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples, failed requests (HTTP faked) |
 
 ### Frontend (dashboard)
 

@@ -57,6 +57,9 @@ interface StatusEvent {
     status?: string;
     milestones?: Milestone[];
     deadline?: string | null;
+    // Set on changes that came from h.i's projects-service
+    source_status?: string;
+    deleted?: boolean;
     timestamp: string;
 }
 
@@ -78,6 +81,8 @@ const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
 const NO_ROW_HOVER = { '--bs-table-hover-bg': 'transparent' } as CSSProperties;
 const programmeName = (p: Project) => p.programme?.trim() || '';
 function describeEvent(evt: StatusEvent): string {
+    if (evt.deleted) return 'removed';
+    if (evt.status && evt.source_status) return `updated to ${evt.status} (${evt.source_status})`;
     if (evt.status) return `updated to ${evt.status}`;
     if (evt.milestones) return 'milestones updated';
     if ('deadline' in evt) return 'deadline updated';

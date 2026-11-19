@@ -15,8 +15,9 @@ class Project extends Model
         'programme',
         'external_id',
         'milestones',
-        'deadline'
-        
+        'deadline',
+        'source_status',
+
 
     ];
 
