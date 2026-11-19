@@ -60,6 +60,9 @@ class ProjectController extends Controller
     'milestones.*.title'    => 'required|string|max:255',
     'milestones.*.deadline' => 'nullable|date_format:Y-m-d', // Allows null or 'YYYY-MM-DD'
     'milestones.*.status'   => 'required|string|in:achieved,not_achieved',
+    // Who is responsible for the milestone (free text, e.g. a member's name). Without this
+    // rule validated() would drop the field, and ticking a milestone would erase it.
+    'milestones.*.assignee' => 'nullable|string|max:255',
 ]);
 
         $project = Project::findOrFail($id);

@@ -31,6 +31,16 @@ class UpdateProjectMilestonesTest extends TestCase
         ];
     }
 
+    /** Same shape as milestones(), with who is responsible for each one. */
+    private function milestonesWithAssignees(): array
+    {
+        return [
+            ['title' => 'Design', 'deadline' => '2026-12-01', 'status' => 'achieved', 'assignee' => 'Ana Ribeiro'],
+            ['title' => 'Launch', 'deadline' => null, 'status' => 'not_achieved', 'assignee' => 'Bruno Costa'],
+            ['title' => 'Docs', 'deadline' => null, 'status' => 'not_achieved', 'assignee' => null],
+        ];
+    }
+
     public function test_it_updates_the_milestones_and_returns_the_project(): void
     {
         $project = Project::factory()->create();
@@ -131,6 +141,89 @@ class UpdateProjectMilestonesTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('milestones.0.title');
+    }
+
+    public function test_it_stores_and_returns_the_assignee_of_each_milestone(): void
+    {
+        $project = Project::factory()->create();
+
+        $this->postJson("/api/projects/{$project->id}/milestones", ['milestones' => $this->milestonesWithAssignees()])
+            ->assertOk()
+            ->assertJsonPath('data.milestones.0.assignee', 'Ana Ribeiro')
+            ->assertJsonPath('data.milestones.1.assignee', 'Bruno Costa')
+            ->assertJsonPath('data.milestones.2.assignee', null);
+
+        $this->assertEquals($this->milestonesWithAssignees(), $project->fresh()->milestones);
+    }
+
+    public function test_it_publishes_the_assignees_in_the_event(): void
+    {
+        $project = Project::factory()->create(['name' => 'Alpha']);
+
+        $this->postJson("/api/projects/{$project->id}/milestones", ['milestones' => $this->milestonesWithAssignees()])
+            ->assertOk();
+
+        Kafka::assertPublishedOnTimes('project-status-events', 1);
+        Kafka::assertPublishedOn('project-status-events', null, function (ProducerMessage $message) use ($project) {
+            $body = $message->getBody();
+
+            return $body['project_id'] === $project->id
+                && $body['milestones'] == $this->milestonesWithAssignees();
+        });
+    }
+
+    public function test_it_keeps_the_assignees_when_the_same_list_is_sent_again_with_one_milestone_changed(): void
+    {
+        $project = Project::factory()->create(['milestones' => $this->milestonesWithAssignees()]);
+
+        // What the dashboard does when a milestone is ticked: resend the whole list.
+        $ticked = $this->milestonesWithAssignees();
+        $ticked[1]['status'] = 'achieved';
+
+        $this->postJson("/api/projects/{$project->id}/milestones", ['milestones' => $ticked])
+            ->assertOk();
+
+        $stored = $project->fresh()->milestones;
+        $this->assertSame('achieved', $stored[1]['status']);
+        $this->assertSame(
+            ['Ana Ribeiro', 'Bruno Costa', null],
+            array_column($stored, 'assignee'),
+        );
+    }
+
+    public function test_the_assignee_is_optional(): void
+    {
+        $project = Project::factory()->create();
+
+        $this->postJson("/api/projects/{$project->id}/milestones", ['milestones' => $this->milestones()])
+            ->assertOk()
+            ->assertJsonMissingPath('data.milestones.0.assignee');
+    }
+
+    public function test_it_rejects_an_assignee_longer_than_255_characters(): void
+    {
+        $project = Project::factory()->create();
+
+        $this->postJson("/api/projects/{$project->id}/milestones", [
+            'milestones' => [['title' => 'Design', 'status' => 'achieved', 'assignee' => str_repeat('a', 256)]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('milestones.0.assignee');
+
+        Kafka::assertNothingPublished();
+    }
+
+    public function test_it_rejects_an_assignee_that_is_not_a_string(): void
+    {
+        $project = Project::factory()->create();
+
+        $this->postJson("/api/projects/{$project->id}/milestones", [
+            'milestones' => [['title' => 'Design', 'status' => 'achieved', 'assignee' => ['Ana']]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('milestones.0.assignee');
+
+        Kafka::assertNothingPublished();
     }
 
     public function test_it_returns_404_for_a_missing_project(): void

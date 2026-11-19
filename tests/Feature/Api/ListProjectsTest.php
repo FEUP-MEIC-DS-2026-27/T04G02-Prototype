@@ -41,6 +41,22 @@ class ListProjectsTest extends TestCase
             ->assertJsonPath('projects.1.status', 'pending');
     }
 
+    public function test_it_returns_the_milestones_with_who_is_responsible_for_each(): void
+    {
+        Project::factory()->create([
+            'milestones' => [
+                ['title' => 'Design', 'deadline' => '2026-12-01', 'status' => 'achieved', 'assignee' => 'Ana Ribeiro'],
+                ['title' => 'Launch', 'deadline' => null, 'status' => 'not_achieved', 'assignee' => 'Bruno Costa'],
+            ],
+        ]);
+
+        $this->getJson('/api/projects')
+            ->assertOk()
+            ->assertJsonPath('projects.0.milestones.0.title', 'Design')
+            ->assertJsonPath('projects.0.milestones.0.assignee', 'Ana Ribeiro')
+            ->assertJsonPath('projects.0.milestones.1.assignee', 'Bruno Costa');
+    }
+
     public function test_stats_count_projects_per_status(): void
     {
         Project::factory()->count(3)->create(['status' => 'pending']);
