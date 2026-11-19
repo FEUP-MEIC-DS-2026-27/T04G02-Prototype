@@ -13,6 +13,10 @@ x-api-env: &api-env
   DB_PASSWORD: ${DB_PASSWORD:-secret}
   KAFKA_BROKERS: project-status-kafka:29092
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3003,http://localhost:3005}
+  # Real projects from h.i's projects-service. Empty = sample projects only (see compose.hi.yaml)
+  PROJECTS_SOURCE_API_URL: ${PROJECTS_SOURCE_API_URL:-}
+  PROJECTS_SOURCE_KAFKA_BROKERS: ${PROJECTS_SOURCE_KAFKA_BROKERS:-}
+  PROJECTS_SOURCE_TOPIC: ${PROJECTS_SOURCE_TOPIC:-projects}
 
 services:
   # Dashboard: Module Federation remote, also works standalone.

@@ -163,6 +163,29 @@ describe('ProjectStatusTracker', () => {
     expect(within(feed).queryByText('ext-2')).not.toBeInTheDocument();
   });
 
+  it('describes changes from projects-service with their original status, and removals', async () => {
+    installFakeProjectsApi(API, seed);
+    renderDashboard();
+    await screen.findByRole('cell', { name: 'Alpha' });
+
+    act(() => {
+      FakeEventSource.latest().emit({
+        project_id: 4, external_id: 'INE-25-0001', status: 'completed', source_status: 'Cancelled',
+        source: 'projects-service', timestamp: 't1',
+      });
+      FakeEventSource.latest().emit({
+        external_id: 'INE-25-0002', deleted: true, source: 'projects-service', timestamp: 't2',
+      });
+    });
+
+    const feed = screen.getByRole('heading', { name: 'Recent SSE Events' }).parentElement!;
+    const [removed, updated] = within(feed).getAllByRole('listitem');
+    expect(removed).toHaveTextContent('INE-25-0002');
+    expect(removed).toHaveTextContent('removed');
+    expect(updated).toHaveTextContent('#4');
+    expect(updated).toHaveTextContent('updated to completed (Cancelled)');
+  });
+
   it('ignores a malformed event but still re-syncs', async () => {
     const api = installFakeProjectsApi(API, seed);
     renderDashboard();
