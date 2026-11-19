@@ -13,7 +13,7 @@ class ProjectFactory extends Factory
     {
         return [
             'name' => fake()->catchPhrase(),
-            'status' => fake()->randomElement(['pending', 'in_progress', 'completed']),
+            'status' => fake()->randomElement(Project::STATUSES),
             'programme' => fake()->randomElement(['Horizon Europe', 'Horizon 2020', 'Portugal 2030']),
             // Prefixed so simulated projects are easy to spot and clean up
             'external_id' => 'sim-' . fake()->uuid(),

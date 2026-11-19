@@ -24,7 +24,7 @@ class ProjectSeeder extends Seeder
             ],
             [
                 'name' => 'Kafka Microservices Migration',
-                'status' => 'in_progress',
+                'status' => 'active',
                 'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-10',
                 'milestones' => [
@@ -45,7 +45,7 @@ class ProjectSeeder extends Seeder
             ],
             [
                 'name' => 'Mobile App API Integration',
-                'status' => 'in_progress',
+                'status' => 'active',
                 'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-15',
                 'milestones' => [
@@ -55,7 +55,7 @@ class ProjectSeeder extends Seeder
             ],
             [
                 'name' => 'Analytics Dashboard V2',
-                'status' => 'pending',
+                'status' => 'planned',
                 'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-22',
                 'milestones' => [
@@ -65,7 +65,7 @@ class ProjectSeeder extends Seeder
             ],
             [
                 'name' => 'Database Index Optimization',
-                'status' => 'pending',
+                'status' => 'cancelled',
                 'programme' => 'Horizon 2020',
                 'deadline' => '2026-11-30',
                 'milestones' => [
@@ -74,7 +74,7 @@ class ProjectSeeder extends Seeder
             ],
             [
                 'name' => 'Payment Gateway Webhooks',
-                'status' => 'in_progress',
+                'status' => 'on_hold',
                 'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-05',
                 'milestones' => [

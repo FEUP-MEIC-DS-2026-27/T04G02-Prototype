@@ -9,10 +9,6 @@ use Junges\Kafka\Message\ConsumedMessage;
 use Junges\Kafka\Message\Message;
 use Tests\TestCase;
 
-/**
- * kafka:consume-source-projects follows projects-service's `projects` topic and
- * republishes each change on project-status-events for the SSE hub.
- */
 class ConsumeSourceProjectEventsTest extends TestCase
 {
     use RefreshDatabase;
@@ -69,7 +65,7 @@ class ConsumeSourceProjectEventsTest extends TestCase
         $this->assertDatabaseHas('projects', [
             'external_id' => 'INE-1',
             'name' => 'Renamed',
-            'status' => 'completed',
+            'status' => 'cancelled',
             'source_status' => 'Cancelled',
         ]);
     }
@@ -91,7 +87,7 @@ class ConsumeSourceProjectEventsTest extends TestCase
             $body = $message->getBody();
 
             return $body['external_id'] === 'INE-1'
-                && $body['status'] === 'in_progress'
+                && $body['status'] === 'active'
                 && $body['source_status'] === 'Active'
                 && $body['source'] === 'projects-service';
         });
@@ -99,7 +95,7 @@ class ConsumeSourceProjectEventsTest extends TestCase
 
     public function test_tombstones_and_invalid_events_are_ignored(): void
     {
-        $existing = Project::factory()->create(['external_id' => 'INE-1', 'status' => 'pending']);
+        $existing = Project::factory()->create(['external_id' => 'INE-1', 'status' => 'planned']);
 
         $this->receive(
             null,
@@ -109,7 +105,7 @@ class ConsumeSourceProjectEventsTest extends TestCase
             $this->event('deleted', 'INE-404'),
         );
 
-        $this->assertSame('pending', $existing->fresh()->status);
+        $this->assertSame('planned', $existing->fresh()->status);
         $this->assertDatabaseCount('projects', 1);
         Kafka::assertNothingPublished();
     }
@@ -123,7 +119,7 @@ class ConsumeSourceProjectEventsTest extends TestCase
 
     public function test_the_own_consumer_skips_the_republished_events(): void
     {
-        $project = Project::factory()->create(['external_id' => 'INE-1', 'status' => 'pending']);
+        $project = Project::factory()->create(['external_id' => 'INE-1', 'status' => 'planned']);
 
         Kafka::shouldReceiveMessages([new ConsumedMessage(
             topicName: 'project-status-events',
@@ -137,6 +133,6 @@ class ConsumeSourceProjectEventsTest extends TestCase
 
         $this->artisan('kafka:consume-projects')->assertSuccessful();
 
-        $this->assertSame('pending', $project->fresh()->status);
+        $this->assertSame('planned', $project->fresh()->status);
     }
 }

@@ -1,15 +1,6 @@
 <?php declare(strict_types=1);
 
-/*
- | Real project data from h.i's projects-service (VA3).
- |
- | projects-service owns the projects. This app keeps a copy in its own database:
- |  - `php artisan projects:import` loads every project from its REST API
- |  - `php artisan kafka:consume-source-projects` follows its `projects` topic
- |
- | Both are off while PROJECTS_SOURCE_API_URL / PROJECTS_SOURCE_KAFKA_BROKERS are empty,
- | so the prototype still runs on its own with the sample projects.
- */
+// Real projects from h.i's projects-service. Empty URL/brokers = sample projects only.
 return [
     'api_url' => env('PROJECTS_SOURCE_API_URL'),
 
@@ -23,20 +14,12 @@ return [
 
     'consumer_group' => env('PROJECTS_SOURCE_CONSUMER_GROUP', 'project-status-source-consumer'),
 
-    /*
-     | projects-service status => this app's status.
-     |
-     | The original status is always stored in `source_status`, so changing this map
-     | (or adding statuses to the dashboard) never loses information.
-     | `On Hold` and `Cancelled` have no equivalent yet: their mapping is provisional
-     | until the team decides whether the dashboard gets its own statuses for them.
-     | A status missing from this map is skipped with a warning.
-     */
+    // projects-service status => our status. Unknown statuses are skipped.
     'status_map' => [
-        'Planned' => 'pending',
-        'Active' => 'in_progress',
-        'On Hold' => 'in_progress',
+        'Planned' => 'planned',
+        'Active' => 'active',
+        'On Hold' => 'on_hold',
         'Completed' => 'completed',
-        'Cancelled' => 'completed',
+        'Cancelled' => 'cancelled',
     ],
 ];

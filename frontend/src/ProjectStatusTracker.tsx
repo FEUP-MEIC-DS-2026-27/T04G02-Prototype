@@ -25,7 +25,7 @@ interface ProjectStatusTrackerProps {
     sseUrl?: string;
 }
 
-type ProjectStatus = 'pending' | 'in_progress' | 'completed';
+type ProjectStatus = 'planned' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 interface Project {
     id: number;
     name: string;
@@ -36,9 +36,11 @@ interface Project {
 }
 export interface Stats {
     total: number;
-    pending: number;
-    in_progress: number;
+    planned: number;
+    active: number;
+    on_hold: number;
     completed: number;
+    cancelled: number;
 }
 
 interface Project {
@@ -57,7 +59,7 @@ interface StatusEvent {
     status?: string;
     milestones?: Milestone[];
     deadline?: string | null;
-    // Set on changes that came from h.i's projects-service
+    // From projects-service
     source_status?: string;
     deleted?: boolean;
     timestamp: string;
@@ -71,7 +73,7 @@ const chartTypes: { value: ChartType; label: string }[] = [
     { value: 'doughnut', label: 'Donut' },
     { value: 'bar', label: 'Bar' },
 ];
-const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
+const emptyStats: Stats = { total: 0, planned: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
 const UNASSIGNED = '__unassigned__';
 const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
@@ -88,11 +90,15 @@ function describeEvent(evt: StatusEvent): string {
     if ('deadline' in evt) return 'deadline updated';
     return 'updated';
 }
-const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: string }> = {
-    pending: { bg: 'bg-warning-subtle', text: 'text-warning-emphasis', label: 'Pending' },
-    in_progress: { bg: 'bg-primary-subtle', text: 'text-primary-emphasis', label: 'In Progress' },
-    completed: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Completed' },
+// tone = Bootstrap color, color = chart color
+const badgeStyles: Record<ProjectStatus, { label: string; tone: string; color: string }> = {
+    planned: { label: 'Planned', tone: 'secondary', color: '#6c757d' },
+    active: { label: 'Active', tone: 'primary', color: '#0d6efd' },
+    on_hold: { label: 'On Hold', tone: 'warning', color: '#ffc107' },
+    completed: { label: 'Completed', tone: 'success', color: '#198754' },
+    cancelled: { label: 'Cancelled', tone: 'danger', color: '#dc3545' },
 };
+const statusOrder = Object.keys(badgeStyles) as ProjectStatus[];
 
 
 export function createStatusDistributionOptions(stats: Stats) {
@@ -109,9 +115,9 @@ export function createStatusDistributionOptions(stats: Stats) {
 }
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
-    const s = badgeStyles[status] ?? badgeStyles.pending;
+    const s = badgeStyles[status] ?? badgeStyles.planned;
     return (
-        <span className={`badge ${s.bg} ${s.text} rounded-pill px-3 py-2`}>
+        <span className={`badge bg-${s.tone}-subtle text-${s.tone}-emphasis rounded-pill px-3 py-2`}>
             {s.label}
         </span>
     );
@@ -171,11 +177,11 @@ async function readJson<T>(res: Response, what: string): Promise<T> {
 }
 export function createStatusDistributionData(stats: Stats) {
     return {
-        labels: ['Pending', 'In Progress', 'Completed'],
+        labels: statusOrder.map((s) => badgeStyles[s].label),
         datasets: [
             {
-                data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
+                data: statusOrder.map((s) => stats[s]),
+                backgroundColor: statusOrder.map((s) => badgeStyles[s].color),
                 borderColor: '#ffffff',
                 borderWidth: 2,
             },
@@ -425,7 +431,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             )}
 
             {/* 1. Metric Cards */}
-            <div className="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+            <div className="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
                 <div className="col">
                     <div className="card h-100">
                         <div className="card-body text-center">
@@ -434,30 +440,16 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                         </div>
                     </div>
                 </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">Pending</p>
-                            <p className="h3 text-warning mb-0">{stats.pending}</p>
+                {statusOrder.map((s) => (
+                    <div className="col" key={s}>
+                        <div className="card h-100">
+                            <div className="card-body text-center">
+                                <p className="small text-secondary fw-medium mb-1">{badgeStyles[s].label}</p>
+                                <p className={`h3 text-${badgeStyles[s].tone} mb-0`}>{stats[s]}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">In Progress</p>
-                            <p className="h3 text-primary mb-0">{stats.in_progress}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">Completed</p>
-                            <p className="h3 text-success mb-0">{stats.completed}</p>
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
 
             {/* 2. Chart & SSE Feed */}
@@ -574,9 +566,9 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             aria-label={`Change status of ${p.name}`}
             className="form-select form-select-sm w-auto"
         >
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
+            {statusOrder.map((s) => (
+                <option key={s} value={s}>{badgeStyles[s].label}</option>
+            ))}
         </select>
     </td>
 

@@ -9,6 +9,9 @@ class Project extends Model
 {
     use HasFactory;
 
+    // Same as h.i's projects-service
+    public const STATUSES = ['planned', 'active', 'on_hold', 'completed', 'cancelled'];
+
     protected $fillable = [
         'name',
         'status',

@@ -43,11 +43,11 @@ class ConsumeProjectEventsTest extends TestCase
 
     public function test_an_event_from_this_app_updates_the_project_by_id(): void
     {
-        $project = Project::factory()->create(['status' => 'pending']);
+        $project = Project::factory()->create(['status' => 'planned']);
 
-        $this->receive(['project_id' => $project->id, 'status' => 'in_progress']);
+        $this->receive(['project_id' => $project->id, 'status' => 'active']);
 
-        $this->assertSame('in_progress', $project->fresh()->status);
+        $this->assertSame('active', $project->fresh()->status);
     }
 
     public function test_an_event_for_an_unknown_id_does_not_create_a_project(): void
@@ -60,7 +60,7 @@ class ConsumeProjectEventsTest extends TestCase
     public function test_an_external_event_creates_the_project_once_then_updates_it(): void
     {
         $this->receive(
-            ['external_id' => 'ext-1', 'name' => 'From another team', 'status' => 'pending'],
+            ['external_id' => 'ext-1', 'name' => 'From another team', 'status' => 'planned'],
             ['external_id' => 'ext-1', 'status' => 'completed'],
         );
 
@@ -75,7 +75,7 @@ class ConsumeProjectEventsTest extends TestCase
     public function test_an_external_event_sets_the_programme_and_keeps_it_when_omitted(): void
     {
         $this->receive(
-            ['external_id' => 'ext-1', 'name' => 'Funded', 'status' => 'pending', 'programme' => ' Horizon Europe '],
+            ['external_id' => 'ext-1', 'name' => 'Funded', 'status' => 'planned', 'programme' => ' Horizon Europe '],
             ['external_id' => 'ext-1', 'status' => 'completed'],
         );
 
@@ -85,8 +85,8 @@ class ConsumeProjectEventsTest extends TestCase
     public function test_an_empty_programme_clears_it(): void
     {
         $this->receive(
-            ['external_id' => 'ext-1', 'status' => 'pending', 'programme' => 'Portugal 2030'],
-            ['external_id' => 'ext-1', 'status' => 'pending', 'programme' => '  '],
+            ['external_id' => 'ext-1', 'status' => 'planned', 'programme' => 'Portugal 2030'],
+            ['external_id' => 'ext-1', 'status' => 'planned', 'programme' => '  '],
         );
 
         $this->assertDatabaseHas('projects', ['external_id' => 'ext-1', 'programme' => null]);
@@ -94,17 +94,17 @@ class ConsumeProjectEventsTest extends TestCase
 
     public function test_an_external_id_never_matches_one_of_our_ids(): void
     {
-        $ours = Project::factory()->create(['status' => 'pending', 'external_id' => null]);
+        $ours = Project::factory()->create(['status' => 'planned', 'external_id' => null]);
 
         $this->receive(['external_id' => (string) $ours->id, 'project_id' => $ours->id, 'status' => 'completed']);
 
-        $this->assertSame('pending', $ours->fresh()->status);
+        $this->assertSame('planned', $ours->fresh()->status);
         $this->assertDatabaseHas('projects', ['external_id' => (string) $ours->id, 'status' => 'completed']);
     }
 
     public function test_invalid_events_are_skipped(): void
     {
-        $project = Project::factory()->create(['status' => 'pending']);
+        $project = Project::factory()->create(['status' => 'planned']);
 
         $this->receive(
             ['project_id' => $project->id, 'status' => 'archived'],
@@ -112,7 +112,7 @@ class ConsumeProjectEventsTest extends TestCase
             ['status' => 'completed'],
         );
 
-        $this->assertSame('pending', $project->fresh()->status);
+        $this->assertSame('planned', $project->fresh()->status);
         $this->assertDatabaseCount('projects', 1);
     }
 }

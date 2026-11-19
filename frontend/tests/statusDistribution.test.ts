@@ -10,18 +10,20 @@ import { createBarOptions, createDoughnutOptions } from '../src/ProjectStatusTra
 
 const stats: Stats = {
     total: 10,
-    pending: 2,
-    in_progress: 3,
-    completed: 5,
+    planned: 2,
+    active: 3,
+    on_hold: 1,
+    completed: 3,
+    cancelled: 1,
 };
 
 describe('status distribution chart', () => {
     it('maps project statistics to the chart datasets in the expected order', () => {
         const chart = createStatusDistributionData(stats);
 
-        expect(chart.labels).toEqual(['Pending', 'In Progress', 'Completed']);
-        expect(chart.datasets[0].data).toEqual([2, 3, 5]);
-        expect(chart.datasets[0].backgroundColor).toEqual(['#ffc107', '#0d6efd', '#198754']);
+        expect(chart.labels).toEqual(['Planned', 'Active', 'On Hold', 'Completed', 'Cancelled']);
+        expect(chart.datasets[0].data).toEqual([2, 3, 1, 3, 1]);
+        expect(chart.datasets[0].backgroundColor).toEqual(['#6c757d', '#0d6efd', '#ffc107', '#198754', '#dc3545']);
     });
 
     it('formats tooltip values with their percentage of all projects', () => {
@@ -35,9 +37,11 @@ describe('status distribution chart', () => {
     it('avoids division by zero when there are no projects', () => {
         const options = createStatusDistributionOptions({
             total: 0,
-            pending: 0,
-            in_progress: 0,
+            planned: 0,
+            active: 0,
+            on_hold: 0,
             completed: 0,
+            cancelled: 0,
         });
 
         expect(options.plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' 0 projects (0%)');
@@ -72,7 +76,7 @@ describe('status distribution chart', () => {
     });
 
     it('rounds the percentage to a whole number', () => {
-        const label = createBarOptions({ total: 3, pending: 1, in_progress: 1, completed: 1 })
+        const label = createBarOptions({ total: 3, planned: 1, active: 1, on_hold: 0, completed: 1, cancelled: 0 })
             .plugins.tooltip.callbacks.label;
 
         expect(label({ raw: 1 })).toBe(' 1 project (33%)');
@@ -91,8 +95,8 @@ describe('status distribution chart', () => {
         ])('%s: shows the status name, number of projects and percentage', (_name, create) => {
             const { title, label } = create(stats).plugins.tooltip.callbacks;
 
-            expect(title([{ label: 'In Progress' }])).toBe('In Progress');
-            expect(label({ label: 'In Progress', raw: 3 })).toBe(' 3 projects (30%)');
+            expect(title([{ label: 'Active' }])).toBe('Active');
+            expect(label({ label: 'Active', raw: 3 })).toBe(' 3 projects (30%)');
         });
 
         it('has no title when nothing is hovered', () => {

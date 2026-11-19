@@ -33,10 +33,7 @@ class ConsumeSourceProjectEvents extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * Events look like {"type": "created|updated|deleted", "projectId": "...", "project": {...}}.
-     * The topic also carries tombstones (null body) after a delete, which are ignored.
-     */
+    // {"type": "created|updated|deleted", "projectId": ..., "project": {...}}; null bodies are tombstones
     private function handleEvent(ProjectSourceSync $sync, mixed $event): void
     {
         if (! is_array($event)) {
