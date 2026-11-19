@@ -21,6 +21,12 @@ php artisan route:cache
 if [ "${1:-}" = "serve" ] && [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force
 
+    # Import the real projects from h.i (a failure doesn't stop the API)
+    if [ -n "${PROJECTS_SOURCE_API_URL:-}" ]; then
+        php artisan projects:import --without-samples \
+            || echo "entrypoint: could not import from ${PROJECTS_SOURCE_API_URL}, see the error above" >&2
+    fi
+
     # Seed the sample projects only on an empty table (ProjectSeeder truncates)
     has_projects=$(php artisan tinker --execute='echo App\Models\Project::query()->exists() ? "yes" : "no";' | tail -n 1)
     if [ "$has_projects" = "no" ]; then

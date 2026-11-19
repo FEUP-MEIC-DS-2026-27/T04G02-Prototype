@@ -16,8 +16,6 @@ class SimulateProjectEvents extends Command
 
     protected $description = 'Publish fake project events to Kafka, as if they came from another system';
 
-    private const STATUSES = ['pending', 'in_progress', 'completed'];
-
     public function handle(): int
     {
         $count = (int) $this->argument('count');
@@ -35,7 +33,7 @@ class SimulateProjectEvents extends Command
             $this->publish($project->external_id, $project->name, $project->status);
 
             if ($this->option('updates')) {
-                $newStatus = fake()->randomElement(array_values(array_diff(self::STATUSES, [$project->status])));
+                $newStatus = fake()->randomElement(array_values(array_diff(Project::STATUSES, [$project->status])));
                 $this->publish($project->external_id, $project->name, $newStatus);
             }
         }

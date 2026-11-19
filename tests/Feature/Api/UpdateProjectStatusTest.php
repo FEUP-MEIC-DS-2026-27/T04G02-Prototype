@@ -25,20 +25,20 @@ class UpdateProjectStatusTest extends TestCase
 
     public function test_it_updates_the_status_and_returns_the_project(): void
     {
-        $project = Project::factory()->create(['name' => 'Alpha', 'status' => 'pending']);
+        $project = Project::factory()->create(['name' => 'Alpha', 'status' => 'planned']);
 
-        $this->postJson("/api/projects/{$project->id}/status", ['status' => 'in_progress'])
+        $this->postJson("/api/projects/{$project->id}/status", ['status' => 'active'])
             ->assertOk()
             ->assertJsonPath('message', 'Status updated and event published to Kafka')
             ->assertJsonPath('data.id', $project->id)
-            ->assertJsonPath('data.status', 'in_progress');
+            ->assertJsonPath('data.status', 'active');
 
-        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'in_progress']);
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'active']);
     }
 
     public function test_it_publishes_the_event_the_sse_hub_and_dashboard_expect(): void
     {
-        $project = Project::factory()->create(['name' => 'Alpha', 'status' => 'pending']);
+        $project = Project::factory()->create(['name' => 'Alpha', 'status' => 'planned']);
 
         $this->postJson("/api/projects/{$project->id}/status", ['status' => 'completed'])->assertOk();
 
@@ -55,25 +55,50 @@ class UpdateProjectStatusTest extends TestCase
 
     public function test_the_update_is_visible_in_the_project_list(): void
     {
-        $project = Project::factory()->create(['status' => 'pending']);
+        $project = Project::factory()->create(['status' => 'planned']);
 
         $this->postJson("/api/projects/{$project->id}/status", ['status' => 'completed'])->assertOk();
 
         $this->getJson('/api/projects')
             ->assertJsonPath('projects.0.status', 'completed')
             ->assertJsonPath('stats.completed', 1)
-            ->assertJsonPath('stats.pending', 0);
+            ->assertJsonPath('stats.planned', 0);
+    }
+
+    public function test_it_accepts_on_hold_and_cancelled(): void
+    {
+        $project = Project::factory()->create(['status' => 'active']);
+
+        $this->postJson("/api/projects/{$project->id}/status", ['status' => 'on_hold'])->assertOk();
+        $this->assertSame('on_hold', $project->fresh()->status);
+
+        $this->postJson("/api/projects/{$project->id}/status", ['status' => 'cancelled'])->assertOk();
+        $this->assertSame('cancelled', $project->fresh()->status);
+    }
+
+    public function test_it_rejects_the_old_status_names(): void
+    {
+        $project = Project::factory()->create(['status' => 'planned']);
+
+        foreach (['pending', 'in_progress'] as $old) {
+            $this->postJson("/api/projects/{$project->id}/status", ['status' => $old])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('status');
+        }
+
+        $this->assertSame('planned', $project->fresh()->status);
+        Kafka::assertNothingPublished();
     }
 
     public function test_it_rejects_an_unknown_status_without_changing_anything(): void
     {
-        $project = Project::factory()->create(['status' => 'pending']);
+        $project = Project::factory()->create(['status' => 'planned']);
 
         $this->postJson("/api/projects/{$project->id}/status", ['status' => 'done'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('status');
 
-        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'pending']);
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'planned']);
         Kafka::assertNothingPublished();
     }
 

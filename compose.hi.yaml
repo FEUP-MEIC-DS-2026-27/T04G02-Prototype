@@ -1,0 +1,61 @@
+# Uses h.i's real projects. Start h.i first, then:
+#   docker compose -f compose.yaml -f compose.hi.yaml up -d --build
+# h.i has its own project-status-db/kafka on its network, hence the unique aliases below.
+
+x-own-env: &own-env
+  DB_HOST: t04g02-db
+  KAFKA_BROKERS: t04g02-kafka:29092
+
+x-source-env: &source-env
+  <<: *own-env
+  PROJECTS_SOURCE_API_URL: http://projects-service:8080
+  PROJECTS_SOURCE_KAFKA_BROKERS: post-events-kafka:9092
+
+services:
+  project-status-api:
+    environment: *source-env
+    networks: [default, hi]
+
+  project-status-consumer:
+    environment: *own-env
+
+  project-status-sse:
+    environment:
+      KAFKA_BROKERS: t04g02-kafka:29092
+
+  project-status-source-consumer:
+    image: project-status-api
+    pull_policy: never
+    command: ["php", "artisan", "kafka:consume-source-projects"]
+    environment:
+      <<: *source-env
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-laravel}
+      DB_USERNAME: ${DB_USERNAME:-laravel}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      APP_KEY: ${APP_KEY:-}
+      KAFKA_OFFSET_RESET: earliest
+    restart: unless-stopped
+    networks: [default, hi]
+    depends_on:
+      project-status-api:
+        condition: service_healthy
+      project-status-kafka:
+        condition: service_healthy
+
+  project-status-db:
+    networks:
+      default:
+        aliases: [t04g02-db]
+
+  project-status-kafka:
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://t04g02-kafka:29092
+    networks:
+      default:
+        aliases: [t04g02-kafka]
+
+networks:
+  hi:
+    name: federation-value-areas_default
+    external: true

@@ -20,36 +20,39 @@ class ListProjectsTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'projects' => [],
-                'stats' => ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'completed' => 0],
+                'stats' => ['total' => 0, 'planned' => 0, 'active' => 0, 'on_hold' => 0, 'completed' => 0, 'cancelled' => 0],
             ]);
     }
 
     public function test_it_returns_projects_ordered_by_id_with_the_fields_the_dashboard_uses(): void
     {
         $second = Project::factory()->create(['name' => 'Beta', 'status' => 'completed']);
-        $first = Project::factory()->create(['name' => 'Alpha', 'status' => 'pending']);
+        $first = Project::factory()->create(['name' => 'Alpha', 'status' => 'planned']);
 
         $this->getJson('/api/projects')
             ->assertOk()
             ->assertJsonStructure([
                 'projects' => [['id', 'name', 'status', 'external_id', 'created_at', 'updated_at']],
-                'stats' => ['total', 'pending', 'in_progress', 'completed'],
+                'stats' => ['total', 'planned', 'active', 'on_hold', 'completed', 'cancelled'],
             ])
             ->assertJsonPath('projects.0.id', $second->id)
             ->assertJsonPath('projects.0.name', 'Beta')
             ->assertJsonPath('projects.1.id', $first->id)
-            ->assertJsonPath('projects.1.status', 'pending');
+            ->assertJsonPath('projects.1.status', 'planned');
     }
 
     public function test_stats_count_projects_per_status(): void
     {
-        Project::factory()->count(3)->create(['status' => 'pending']);
-        Project::factory()->count(2)->create(['status' => 'in_progress']);
+        Project::factory()->count(3)->create(['status' => 'planned']);
+        Project::factory()->count(2)->create(['status' => 'active']);
         Project::factory()->create(['status' => 'completed']);
+        Project::factory()->create(['status' => 'cancelled']);
 
         $this->getJson('/api/projects')
             ->assertOk()
-            ->assertJsonCount(6, 'projects')
-            ->assertJsonPath('stats', ['total' => 6, 'pending' => 3, 'in_progress' => 2, 'completed' => 1]);
+            ->assertJsonCount(7, 'projects')
+            ->assertJsonPath('stats', [
+                'total' => 7, 'planned' => 3, 'active' => 2, 'on_hold' => 0, 'completed' => 1, 'cancelled' => 1,
+            ]);
     }
 }
