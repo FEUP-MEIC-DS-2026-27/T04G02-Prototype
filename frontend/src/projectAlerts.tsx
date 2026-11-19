@@ -7,6 +7,8 @@ export interface Milestone {
     title: string;
     deadline?: string | null;
     status: 'achieved' | 'not_achieved';
+    /** Who is responsible for the milestone (a member's name). */
+    assignee?: string | null;
 }
 
 export interface AlertInput {
