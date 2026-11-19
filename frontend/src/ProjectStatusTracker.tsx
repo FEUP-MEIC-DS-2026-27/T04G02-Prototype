@@ -431,7 +431,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             )}
 
             {/* 1. Metric Cards */}
-            <div className="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
+            <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
                 <div className="col">
                     <div className="card h-100">
                         <div className="card-body text-center">
