@@ -222,12 +222,12 @@ describe('ProjectStatusTracker', () => {
   expect(createStatusDistributionData(stats).datasets[0].data).toEqual([1, 1, 2]);
 
   const label = createBarOptions(stats).plugins.tooltip.callbacks.label;
-  expect(label({ raw: 2 })).toBe(' Amount: 2 (50%)');
-  expect(label({ raw: 0 })).toBe(' Amount: 0 (0%)');
+  expect(label({ raw: 2 })).toBe(' 2 projects (50%)');
+  expect(label({ raw: 0 })).toBe(' 0 projects (0%)');
 });
 
 it('does not divide by zero when there are no projects', () => {
   const empty = { total: 0, pending: 0, in_progress: 0, completed: 0 };
-  expect(createBarOptions(empty).plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' Amount: 0 (0%)');
+  expect(createBarOptions(empty).plugins.tooltip.callbacks.label({ raw: 0 })).toBe(' 0 projects (0%)');
 });
 });
