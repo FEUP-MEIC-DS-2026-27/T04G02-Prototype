@@ -115,7 +115,7 @@ Events on the `project-status-events` topic are JSON objects with:
 
 | Field         | Required | Meaning                                                                                   |
 |---------------|----------|-------------------------------------------------------------------------------------------|
-| `status`      | yes      | `pending`, `in_progress` or `completed`                                                   |
+| `status`      | yes      | `planned`, `active`, `on_hold`, `completed` or `cancelled` (see [Statuses](#statuses))    |
 | `project_id`  | one of   | This app's own project id. Only updates an existing project, never creates one            |
 | `external_id` | one of   | Another system's id. Creates the project if it doesn't exist yet, otherwise updates it    |
 | `name`        | no       | Project name, used when the project is created (defaults to `Untitled Project`)           |
@@ -129,8 +129,8 @@ Events with an invalid `status`, or with neither id, are skipped by `project-sta
 Publish events with Kafka's console producer, one JSON object per line. Use an `external_id` starting with `sim-` so the test projects are easy to clean up:
 ```shell
 docker compose exec -T project-status-kafka kafka-console-producer --bootstrap-server project-status-kafka:29092 --topic project-status-events <<'EOF'
-{"external_id":"sim-1","name":"CRM Import","status":"pending","timestamp":"2026-10-30T12:00:00Z"}
-{"external_id":"sim-2","name":"Billing Sync","status":"in_progress"}
+{"external_id":"sim-1","name":"CRM Import","status":"planned","timestamp":"2026-10-30T12:00:00Z"}
+{"external_id":"sim-2","name":"Billing Sync","status":"active"}
 {"external_id":"sim-1","status":"completed"}
 EOF
 ```
@@ -173,17 +173,19 @@ Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). The
 
 ### Statuses
 
-projects-service has five statuses; the dashboard has three. `config/project_source.php` maps them, and the original one is stored in `source_status`:
+The dashboard uses the same five statuses as projects-service (`Project::STATUSES`). `config/project_source.php` maps their names, and the original one is also stored in `source_status`:
 
-| projects-service | `status`      |
-|------------------|---------------|
-| Planned          | `pending`     |
-| Active           | `in_progress` |
-| On Hold          | `in_progress` (provisional) |
-| Completed        | `completed`   |
-| Cancelled        | `completed` (provisional)   |
+| projects-service | `status`    | Dashboard        |
+|------------------|-------------|------------------|
+| Planned          | `planned`   | grey             |
+| Active           | `active`    | blue             |
+| On Hold          | `on_hold`   | yellow           |
+| Completed        | `completed` | green            |
+| Cancelled        | `cancelled` | red              |
 
 A status missing from the map is skipped with a warning.
+
+The old `pending` and `in_progress` statuses were renamed (migration `2026_11_19_110000_use_project_service_statuses`) and the API now rejects them with a 422. h.i's tests that mock this API must use the new names.
 
 ### Known limitations
 
@@ -214,7 +216,7 @@ To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
 
 | Folder                  | What it covers                                                               |
 |-------------------------|------------------------------------------------------------------------------|
-| `tests/Feature/Api`     | `GET /api/projects`, `POST /api/projects/{id}/status` (incl. the Kafka event it publishes), CORS for the h.i origins |
+| `tests/Feature/Api`     | `GET /api/projects` (stats for the five statuses), `POST /api/projects/{id}/status` (incl. the Kafka event it publishes, rejecting the old statuses), CORS for the h.i origins |
 | `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing |
 | `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples, failed requests (HTTP faked) |
 
