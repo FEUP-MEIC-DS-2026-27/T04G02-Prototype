@@ -23,6 +23,7 @@ class ProjectFactory extends Factory
                 'title' => fake()->bs(),
                 'deadline' => fake()->dateTimeBetween('now', '+2 months')->format('Y-m-d'),
                 'status' => fake()->randomElement(['achieved', 'not_achieved']),
+                'assignee' => fake()->name(),
             ])->all(),
         ];
     }

@@ -18,8 +18,8 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Horizon Europe',
                 'deadline' => '2026-10-15',
                 'milestones' => [
-                    ['title' => 'UI/UX Wireframes', 'deadline' => '2026-09-15', 'status' => 'achieved'],
-                    ['title' => 'Checkout Flow Implementation', 'deadline' => '2026-10-10', 'status' => 'achieved'],
+                    ['title' => 'UI/UX Wireframes', 'deadline' => '2026-09-15', 'status' => 'achieved', 'assignee' => 'Ana Ribeiro'],
+                    ['title' => 'Checkout Flow Implementation', 'deadline' => '2026-10-10', 'status' => 'achieved', 'assignee' => 'Bruno Costa'],
                 ],
             ],
             [
@@ -28,9 +28,9 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-10',
                 'milestones' => [
-                    ['title' => 'Cluster Setup & Brokers', 'deadline' => '2026-11-01', 'status' => 'achieved'],
+                    ['title' => 'Cluster Setup & Brokers', 'deadline' => '2026-11-01', 'status' => 'achieved', 'assignee' => 'Carla Mendes'],
                     // Past date (before Nov 17, 2026) + not_achieved = great for testing "overdue" UI badges
-                    ['title' => 'Consumer Services Cutover', 'deadline' => '2026-11-14', 'status' => 'not_achieved'],
+                    ['title' => 'Consumer Services Cutover', 'deadline' => '2026-11-14', 'status' => 'not_achieved', 'assignee' => 'Rui Almeida'],
                 ],
             ],
             [
@@ -39,8 +39,8 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Horizon 2020',
                 'deadline' => '2026-10-25',
                 'milestones' => [
-                    ['title' => 'OAuth2 Token Migration', 'deadline' => '2026-10-01', 'status' => 'achieved'],
-                    ['title' => 'Security Audit', 'deadline' => '2026-10-20', 'status' => 'achieved'],
+                    ['title' => 'OAuth2 Token Migration', 'deadline' => '2026-10-01', 'status' => 'achieved', 'assignee' => 'Bruno Costa'],
+                    ['title' => 'Security Audit', 'deadline' => '2026-10-20', 'status' => 'achieved', 'assignee' => 'Carla Mendes'],
                 ],
             ],
             [
@@ -49,8 +49,8 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-15',
                 'milestones' => [
-                    ['title' => 'Push Notifications Endpoint', 'deadline' => '2026-11-10', 'status' => 'achieved'],
-                    ['title' => 'Offline Sync Support', 'deadline' => '2026-12-12', 'status' => 'not_achieved'],
+                    ['title' => 'Push Notifications Endpoint', 'deadline' => '2026-11-10', 'status' => 'achieved', 'assignee' => 'Ana Ribeiro'],
+                    ['title' => 'Offline Sync Support', 'deadline' => '2026-12-12', 'status' => 'not_achieved', 'assignee' => 'Rui Almeida'],
                 ],
             ],
             [
@@ -59,8 +59,8 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Portugal 2030',
                 'deadline' => '2026-12-22',
                 'milestones' => [
-                    ['title' => 'Data Aggregation Queries', 'deadline' => '2026-12-01', 'status' => 'not_achieved'],
-                    ['title' => 'Chart Components Integration', 'deadline' => '2026-12-20', 'status' => 'not_achieved'],
+                    ['title' => 'Data Aggregation Queries', 'deadline' => '2026-12-01', 'status' => 'not_achieved', 'assignee' => 'Carla Mendes'],
+                    ['title' => 'Chart Components Integration', 'deadline' => '2026-12-20', 'status' => 'not_achieved', 'assignee' => 'Ana Ribeiro'],
                 ],
             ],
             [
@@ -69,7 +69,7 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Horizon 2020',
                 'deadline' => '2026-11-30',
                 'milestones' => [
-                    ['title' => 'Slow Query Profiling', 'deadline' => '2026-11-28', 'status' => 'not_achieved'],
+                    ['title' => 'Slow Query Profiling', 'deadline' => '2026-11-28', 'status' => 'not_achieved', 'assignee' => 'Rui Almeida'],
                 ],
             ],
             [
@@ -78,8 +78,8 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Horizon Europe',
                 'deadline' => '2026-12-05',
                 'milestones' => [
-                    ['title' => 'Stripe Signature Verification', 'deadline' => '2026-11-12', 'status' => 'achieved'],
-                    ['title' => 'Idempotency & Retry Queue', 'deadline' => '2026-12-03', 'status' => 'not_achieved'],
+                    ['title' => 'Stripe Signature Verification', 'deadline' => '2026-11-12', 'status' => 'achieved', 'assignee' => 'Bruno Costa'],
+                    ['title' => 'Idempotency & Retry Queue', 'deadline' => '2026-12-03', 'status' => 'not_achieved', 'assignee' => 'Carla Mendes'],
                 ],
             ],
             [
@@ -88,7 +88,7 @@ class ProjectSeeder extends Seeder
                 'programme' => 'Portugal 2030',
                 'deadline' => '2026-10-02',
                 'milestones' => [
-                    ['title' => 'Interactive Tutorial Steps', 'deadline' => '2026-09-30', 'status' => 'achieved'],
+                    ['title' => 'Interactive Tutorial Steps', 'deadline' => '2026-09-30', 'status' => 'achieved', 'assignee' => 'Ana Ribeiro'],
                 ],
             ],
         ];
