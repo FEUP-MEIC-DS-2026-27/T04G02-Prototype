@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
@@ -69,6 +69,10 @@ const chartTypes: { value: ChartType; label: string }[] = [
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
 const UNASSIGNED = '__unassigned__';
+
+// The table highlights rows on hover (table-hover). The expanded progress row is not
+// clickable, so it opts out of that highlight.
+const NO_ROW_HOVER = { '--bs-table-hover-bg': 'transparent' } as CSSProperties;
 const programmeName = (p: Project) => p.programme?.trim() || '';
 function describeEvent(evt: StatusEvent): string {
     if (evt.status) return `updated to ${evt.status}`;
@@ -498,7 +502,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                         <table className="table table-hover align-middle mb-0">
                             <thead className="table-light text-secondary">
                                 <tr>
-                                     <th scope="col" style={{ width: '2rem' }}><span className="visually-hidden">Milestones</span></th>
+                                     <th scope="col"><span className="visually-hidden">Milestones</span></th>
                                         <th scope="col" className="fw-medium small">ID</th>
                                                                         
                                   
@@ -521,13 +525,13 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 <td>
                     <button
                         type="button"
-                        className="btn btn-sm btn-link p-0 text-decoration-none"
+                        className="btn btn-sm btn-outline-primary rounded-pill px-3 text-nowrap"
                         aria-expanded={open}
                         aria-controls={`milestones-${p.id}`}
                         aria-label={`${open ? 'Hide' : 'Show'} milestones of ${p.name}`}
                         onClick={() => toggleExpanded(p.id)}
                     >
-                        {open ? '▾' : '▸'}
+                        {open ? 'Hide progress' : 'Show progress'}
                     </button>
                 </td>
     <td className="text-secondary">#{p.id}</td>
@@ -552,7 +556,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
 
             </tr>
             {open && (
-                <tr id={`milestones-${p.id}`}>
+                <tr id={`milestones-${p.id}`} style={NO_ROW_HOVER}>
                     <td colSpan={8} className="bg-body-tertiary">
                         {milestones.length === 0 ? (
                             <p className="text-secondary small mb-0">No milestones for this project.</p>
