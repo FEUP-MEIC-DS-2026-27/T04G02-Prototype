@@ -1,8 +1,9 @@
 import { Chart } from 'chart.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     createStatusDistributionData,
     createStatusDistributionOptions,
+    createDoughnutCenterPlugin,
     type Stats,
 } from '../src/ProjectStatusTracker';
 import { createBarOptions, createDoughnutOptions } from '../src/ProjectStatusTracker';
@@ -21,7 +22,29 @@ describe('status distribution chart', () => {
 
         expect(chart.labels).toEqual(['Pending', 'In Progress', 'Completed']);
         expect(chart.datasets[0].data).toEqual([2, 3, 5]);
-        expect(chart.datasets[0].backgroundColor).toEqual(['#ffc107', '#0d6efd', '#198754']);
+        expect(chart.datasets[0].backgroundColor).toEqual(['#e6b422', '#3478c8', '#25845a']);
+    });
+
+    it('draws the total and its label at the center of the doughnut', () => {
+        const ctx = {
+            save: vi.fn(),
+            restore: vi.fn(),
+            fillText: vi.fn(),
+            textAlign: '',
+            textBaseline: '',
+            fillStyle: '',
+            font: '',
+        };
+        const plugin = createDoughnutCenterPlugin(stats.total);
+        const chart = {
+            ctx,
+            getDatasetMeta: () => ({ data: [{ x: 50, y: 60 }] }),
+        };
+
+        plugin.afterDraw?.(chart as never, {} as never, {} as never);
+
+        expect(ctx.fillText).toHaveBeenNthCalledWith(1, '10', 50, 53);
+        expect(ctx.fillText).toHaveBeenNthCalledWith(2, 'projects', 50, 77);
     });
 
     it('formats tooltip values with their percentage of all projects', () => {

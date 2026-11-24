@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend, type Plugin } from 'chart.js';
 import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
 import Loading from './Loading';
@@ -167,11 +167,33 @@ export function createStatusDistributionData(stats: Stats) {
         datasets: [
             {
                 data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
+                backgroundColor: ['#5800a0', '#be6600', '#006809'],
                 borderColor: '#ffffff',
                 borderWidth: 2,
             },
         ],
+    };
+}
+
+export function createDoughnutCenterPlugin(total: number): Plugin<'doughnut'> {
+    return {
+        id: 'doughnutCenterText',
+        afterDraw(chart) {
+            const arc = chart.getDatasetMeta(0).data[0];
+            if (!arc) return;
+
+            const { ctx } = chart;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#212529';
+            ctx.font = '600 30px system-ui, sans-serif';
+            ctx.fillText(String(total), arc.x, arc.y - 7);
+            ctx.fillStyle = '#6c757d';
+            ctx.font = '12px system-ui, sans-serif';
+            ctx.fillText(total === 1 ? 'project' : 'projects', arc.x, arc.y + 17);
+            ctx.restore();
+        },
     };
 }
 
@@ -461,7 +483,11 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 ) : chartType === 'bar' ? (
                                     <Bar data={statusDistributionData} options={barOptions} />
                                 ) : (
-                                    <Doughnut data={statusDistributionData} options={doughnutOptions} />
+                                    <Doughnut
+                                        data={statusDistributionData}
+                                        options={doughnutOptions}
+                                        plugins={[createDoughnutCenterPlugin(stats.total)]}
+                                    />
                                 )}
                             </div>
                         </div>
