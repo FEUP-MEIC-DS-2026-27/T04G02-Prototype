@@ -3,6 +3,8 @@ import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, T
 import { Doughnut,Bar } from 'react-chartjs-2';
 import ErrorMessage from './ErrorMessage';
 import Loading from './Loading';
+import DateField from './DateField';
+import { isDeadlineInRange, isRangeActive, isRangeReversed, type DeadlineRange } from './deadlineFilter';
 import { summariseMemberProgress } from './memberProgress';
 import { milestoneInfo, sortByAlert, type AlertLevel, type Milestone, type MilestoneState, type ProjectAlert } from './projectAlerts';
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -69,6 +71,7 @@ const chartTypes: { value: ChartType; label: string }[] = [
 const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
 const UNASSIGNED = '__unassigned__';
+const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
 
 // The table highlights rows on hover (table-hover). The expanded progress row is not
 // clickable, so it opts out of that highlight.
@@ -218,6 +221,7 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, apiPath
     const [projects, setProjects] = useState<Project[]>([]);
     const [programme, setProgramme] = useState('');
     const [selectedProjectId, setSelectedProjectId] = useState('');
+    const [deadlineRange, setDeadlineRange] = useState<DeadlineRange>(ANY_DEADLINE);
     const [events, setEvents] = useState<StatusEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -228,7 +232,8 @@ export default function ProjectStatusTracker({ apiUrl = DEFAULT_API_URL, apiPath
     const programmes = useMemo(() => [...new Set(projects.map(programmeName).filter(Boolean))].sort(), [projects]);
     const filteredProjects = useMemo(() => projects.filter((p) =>
         (!programme || (programme === UNASSIGNED ? !programmeName(p) : programmeName(p) === programme))
-        && (!selectedProjectId || String(p.id) === selectedProjectId)), [projects, programme, selectedProjectId]);
+        && (!selectedProjectId || String(p.id) === selectedProjectId)
+        && isDeadlineInRange(p.deadline, deadlineRange)), [projects, programme, selectedProjectId, deadlineRange]);
     // Totals follow the filters, so they are counted here rather than taken from the API's stats.
     const stats = useMemo(() => filteredProjects.reduce<Stats>((result, p) => {
         result.total += 1;
@@ -324,7 +329,8 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
         };
     }, [fetchProjects, sseUrl]);
 
-    const filtering = programme !== '' || selectedProjectId !== '';
+    const rangeReversed = isRangeReversed(deadlineRange);
+    const filtering = programme !== '' || selectedProjectId !== '' || isRangeActive(deadlineRange);
     const filteredIds = new Set(filteredProjects.map((p) => p.id));
     const visibleEvents = filtering
         ? events.filter((evt) => evt.project_id != null && filteredIds.has(evt.project_id))
@@ -368,13 +374,28 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
+                        <div className="col-12 col-md-6 col-xl-2">
+                            <DateField id="project-deadline-from" label="Deadline from" value={deadlineRange.from} disabled={loading}
+                                invalid={rangeReversed} describedBy={rangeReversed ? 'project-deadline-error' : undefined}
+                                onChange={(from) => setDeadlineRange({ ...deadlineRange, from })} />
+                        </div>
+                        <div className="col-12 col-md-6 col-xl-2">
+                            <DateField id="project-deadline-to" label="Deadline to" value={deadlineRange.to} disabled={loading}
+                                invalid={rangeReversed} describedBy={rangeReversed ? 'project-deadline-error' : undefined}
+                                onChange={(to) => setDeadlineRange({ ...deadlineRange, to })} />
+                        </div>
                         <div className="col-auto">
                             <button type="button" className="btn btn-outline-secondary"
-                                onClick={() => { setProgramme(''); setSelectedProjectId(''); }}>
+                                onClick={() => { setProgramme(''); setSelectedProjectId(''); setDeadlineRange(ANY_DEADLINE); }}>
                                 Clear filters
                             </button>
                         </div>
                     </div>
+                    {rangeReversed && (
+                        <p id="project-deadline-error" className="small text-danger mt-2 mb-0" role="alert">
+                            "Deadline from" must be on or before "Deadline to".
+                        </p>
+                    )}
                     <p className="small text-secondary mt-3 mb-0" role="status">
                         Showing {filteredProjects.length} of {projects.length} projects.
                     </p>

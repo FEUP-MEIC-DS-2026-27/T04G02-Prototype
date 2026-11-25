@@ -192,6 +192,8 @@ npm test        # or `npm run test:watch` while developing
 |--------------------------------------------|--------------------------------------------------------------------|
 | `tests/ProjectStatusTracker.test.tsx`      | The dashboard against a fake API and SSE hub: loading, status changes, errors, live events, reconnecting, closing the connection on unmount |
 | `tests/ProjectStatusTracker.filters.test.tsx` | Funding programme and project filters (same cases as h.i's browser test), and the `apiPath` prop used behind the h.i gateway |
+| `tests/ProjectStatusTracker.deadlineFilter.test.tsx` | Deadline range filter: which projects, totals, chart and live events it keeps, reversed ranges, clearing |
+| `tests/DateField.test.tsx` | The calendar of the deadline filter: choosing and clearing a date, keyboard, closing, month arithmetic |
 | `tests/federation-contract.test.ts`        | What h.i's VA3 relies on: remote name `project_status`, the `./Dashboard` expose, shared React/router versions, `contractVersion`, and `dist/mf-manifest.json` (only after `npm run build`) |
 
 If a federation contract test fails, h.i will break too. Change `packages/config/src/federation.ts` in h.i at the same time, or don't make the change.

@@ -7,6 +7,7 @@ export interface FakeProject {
   name: string;
   status: Status;
   programme?: string | null;
+  deadline?: string | null;
 }
 
 const statuses: Status[] = ['pending', 'in_progress', 'completed'];
