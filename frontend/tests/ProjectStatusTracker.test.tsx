@@ -182,6 +182,24 @@ describe('ProjectStatusTracker', () => {
     await waitFor(() => expect(statCard('Completed')).toHaveTextContent('2'));
   });
 
+  it('reloads the projects once for a burst of live events', async () => {
+    const api = installFakeProjectsApi(API, seed);
+    renderDashboard();
+    await screen.findByRole('cell', { name: 'Alpha' });
+    const loads = () => api.requests.filter((r) => r.method === 'GET').length;
+    expect(loads()).toBe(1);
+
+    api.setStatus(2, 'completed');
+    act(() => {
+      for (let i = 0; i < 10; i++) {
+        FakeEventSource.latest().emit({ project_id: 2, status: 'completed', timestamp: `t${i}` });
+      }
+    });
+
+    await waitFor(() => expect(statCard('Completed')).toHaveTextContent('2'));
+    expect(loads()).toBe(2);
+  });
+
   it('shows external events by their external id and keeps only the 5 latest', async () => {
     installFakeProjectsApi(API, seed);
     renderDashboard();

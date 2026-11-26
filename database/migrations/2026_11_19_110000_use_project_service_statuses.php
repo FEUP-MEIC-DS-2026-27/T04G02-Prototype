@@ -16,13 +16,7 @@ return new class extends Migration
     {
         $this->dropStatusRule();
 
-        // Imported projects keep their original status ('On Hold' -> 'on_hold')
-        foreach (self::NEW as $status) {
-            DB::table('projects')
-                ->where('source_status', ucwords(str_replace('_', ' ', $status)))
-                ->update(['status' => $status]);
-        }
-
+        // Nothing is imported yet (source_status was just added), so only the old names change
         DB::table('projects')->where('status', 'pending')->update(['status' => 'planned']);
         DB::table('projects')->where('status', 'in_progress')->update(['status' => 'active']);
 

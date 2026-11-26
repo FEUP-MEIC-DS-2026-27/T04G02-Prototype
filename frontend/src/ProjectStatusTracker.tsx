@@ -84,6 +84,9 @@ const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
 // clickable, so it opts out of that highlight.
 const NO_ROW_HOVER = { '--bs-table-hover-bg': 'transparent' } as CSSProperties;
 const programmeName = (p: Project) => p.programme?.trim() || '';
+
+/** Live events arriving within this window cause a single reload of the projects. */
+const REFRESH_DELAY_MS = 300;
 function describeEvent(evt: StatusEvent): string {
     if (evt.deleted) return 'removed';
     if (evt.status && evt.source_status) return `updated to ${evt.status} (${evt.source_status})`;
@@ -325,6 +328,15 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
 
         // EventSource reconnects by itself after an error, so the connection is not closed here.
         const eventSource = new EventSource(sseUrl);
+        // Re-sync at most once per REFRESH_DELAY_MS, however many events arrive
+        let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+        const scheduleRefresh = () => {
+            if (refreshTimer !== undefined) return;
+            refreshTimer = setTimeout(() => {
+                refreshTimer = undefined;
+                fetchProjects(controller.signal);
+            }, REFRESH_DELAY_MS);
+        };
         eventSource.onopen = () => setLive('live');
         eventSource.onmessage = (event: MessageEvent<string>) => {
             try {
@@ -332,11 +344,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 setEvents((prev) => [data, ...prev.slice(0, 4)]); // Keep the 5 latest events
             } catch {
             }
-            fetchProjects(controller.signal); // Re-sync metric state & chart data
+            scheduleRefresh(); // Re-sync metric state & chart data
         };
         eventSource.onerror = () => setLive('reconnecting');
 
         return () => {
+            clearTimeout(refreshTimer);
             controller.abort();
             eventSource.close();
         };
@@ -346,7 +359,8 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
     const filtering = programme !== '' || selectedProjectId !== '' || isRangeActive(deadlineRange);
     const filteredIds = new Set(filteredProjects.map((p) => p.id));
     const visibleEvents = filtering
-        ? events.filter((evt) => evt.project_id != null && filteredIds.has(evt.project_id))
+        // A deleted project is in no filter any more, so its event always stays visible
+        ? events.filter((evt) => evt.deleted || (evt.project_id != null && filteredIds.has(evt.project_id)))
         : events;
 
     // Chart Data
@@ -369,6 +383,8 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             <div className="card mb-4">
                 <div className="card-body">
                     <div className="row g-3 align-items-end">
+                        {/* Hidden when no project has a programme (e.g. projects-service has none) */}
+                        {programmes.length > 0 && (
                         <div className="col-12 col-md-6 col-xl-3">
                             <label htmlFor="project-programme" className="form-label">Funding programme</label>
                             <select id="project-programme" className="form-select" value={programme}
@@ -378,6 +394,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 <option value={UNASSIGNED}>Unassigned</option>
                             </select>
                         </div>
+                        )}
                         <div className="col-12 col-md-6 col-xl-3">
                             <label htmlFor="project-filter" className="form-label">Project</label>
                             <select id="project-filter" className="form-select" value={selectedProjectId}

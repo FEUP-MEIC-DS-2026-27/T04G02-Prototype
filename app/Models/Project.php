@@ -20,8 +20,6 @@ class Project extends Model
         'milestones',
         'deadline',
         'source_status',
-
-
     ];
 
     protected function casts(): array{

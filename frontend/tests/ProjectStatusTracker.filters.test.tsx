@@ -121,6 +121,33 @@ describe('ProjectStatusTracker filters', () => {
     expect(within(feed()).getAllByRole('listitem')).toHaveLength(1);
     expect(within(feed()).getByText('#103')).toBeInTheDocument();
   });
+
+  it('keeps deleted projects in the live events while filtering', async () => {
+    const user = userEvent.setup();
+    await renderDashboard();
+    await user.selectOptions(programmeFilter(), 'FCT');
+
+    act(() => {
+      FakeEventSource.latest().emit({ project_id: 101, status: 'completed', timestamp: 't1' });
+      FakeEventSource.latest().emit({ external_id: 'INE-25-0009', deleted: true, timestamp: 't2' });
+    });
+
+    const feed = screen.getByRole('heading', { name: 'Recent SSE Events' }).parentElement!;
+    expect(within(feed).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(feed).getByText('INE-25-0009')).toBeInTheDocument();
+  });
+
+  it('hides the programme filter when no project has a programme', async () => {
+    installFakeProjectsApi(API, [
+      { id: 1, name: 'Imported', status: 'active', programme: null },
+      { id: 2, name: 'Also imported', status: 'planned' },
+    ]);
+    render(<ProjectStatusTracker apiUrl={API} sseUrl={SSE} />);
+    await screen.findByRole('cell', { name: 'Imported' });
+
+    expect(screen.queryByRole('combobox', { name: 'Funding programme' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Project' })).toBeInTheDocument();
+  });
 });
 
 describe('ProjectStatusTracker behind the h.i gateway', () => {
