@@ -133,6 +133,20 @@ describe('ProjectStatusTracker', () => {
     expect(screen.getByTestId('status-chart')).toHaveTextContent('0,0,1,1,1');
   });
 
+  it('shows imported projects without a status control', async () => {
+    installFakeProjectsApi(API, [
+      { id: 1, name: 'Alpha', status: 'planned' },
+      { id: 2, name: 'Imported', status: 'on_hold', source_status: 'On Hold' },
+    ]);
+    renderDashboard();
+    await screen.findByRole('cell', { name: 'Imported' });
+
+    expect(within(row('Imported')).queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(row('Imported')).getByText('Set in projects-service')).toBeInTheDocument();
+    expect(within(row('Imported')).getByText('On Hold', { selector: '.badge' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Change status of Alpha' })).toBeEnabled();
+  });
+
   it('shows an error when the API cannot be reached', async () => {
     installFakeProjectsApi('http://somewhere-else.test', seed);
     renderDashboard();

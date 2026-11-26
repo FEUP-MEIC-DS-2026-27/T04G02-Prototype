@@ -33,6 +33,8 @@ interface Project {
     programme?: string | null;
     deadline?: string | null;
     milestones?: Milestone[];
+    /** Set for projects imported from h.i's projects-service, which owns their status. */
+    source_status?: string | null;
 }
 export interface Stats {
     total: number;
@@ -559,6 +561,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
     <td><AlertBadge alert={alert} /></td>
     <td><StatusBadge status={p.status} /></td>
     <td>
+        {p.source_status ? (
+            <span className="small text-secondary text-nowrap"
+                title="This project comes from h.i's projects-service, which owns its status.">
+                Set in projects-service
+            </span>
+        ) : (
         <select
             value={p.status}
             onChange={(e) => handleStatusChange(p.id, e.target.value as ProjectStatus)}
@@ -570,6 +578,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 <option key={s} value={s}>{badgeStyles[s].label}</option>
             ))}
         </select>
+        )}
     </td>
 
             </tr>

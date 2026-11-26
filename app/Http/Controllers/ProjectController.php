@@ -31,6 +31,11 @@ class ProjectController extends Controller
         ]);
 
         $project = Project::findOrFail($id);
+
+        if ($response = $this->rejectIfFromProjectsService($project)) {
+            return $response;
+        }
+
         $project->update(['status' => $validated['status']]);
 
         $message = new Message(
@@ -96,6 +101,11 @@ class ProjectController extends Controller
         ]);
 
         $project = Project::findOrFail($id);
+
+        if ($response = $this->rejectIfFromProjectsService($project)) {
+            return $response;
+        }
+
         $project->update(['deadline' => $validated['deadline']]);
         $message = new Message(
             body: [
@@ -114,5 +124,18 @@ class ProjectController extends Controller
             'message' => 'Deadline updated successfully',
             'data'    => $project,
         ]);
+    }
+
+    // projects-service owns the status and deadline of the projects imported from it:
+    // a change here would be overwritten by the next sync and never reach it.
+    private function rejectIfFromProjectsService(Project $project)
+    {
+        if ($project->source_status === null) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'This project comes from projects-service, so its status and deadline can only be changed there.',
+        ], 409);
     }
 }

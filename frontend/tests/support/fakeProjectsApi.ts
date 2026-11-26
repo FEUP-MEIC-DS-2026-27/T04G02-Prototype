@@ -8,6 +8,7 @@ export interface FakeProject {
   status: Status;
   programme?: string | null;
   deadline?: string | null;
+  source_status?: string | null;
 }
 
 const statuses: Status[] = ['planned', 'active', 'on_hold', 'completed', 'cancelled'];
@@ -60,6 +61,9 @@ export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[], 
       }
       const project = projects.find((p) => p.id === Number(update[1]));
       if (!project) return json({ message: `No query results for model [App\\Models\\Project] ${update[1]}` }, 404);
+      if (project.source_status) {
+        return json({ message: 'This project comes from projects-service, so its status and deadline can only be changed there.' }, 409);
+      }
       project.status = body.status;
       return json({ message: 'Status updated and event published to Kafka', data: project });
     }

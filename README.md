@@ -182,7 +182,7 @@ Most missing pieces fail quietly, so check these if the dashboard shows the wron
 - has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. It also removes the projects it imported before that are no longer in projects-service (deleted while the consumer wasn't running); projects from other systems are kept. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
 - adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live.
 
-Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`.
+Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`. projects-service owns their status and deadline: the dashboard shows "Set in projects-service" instead of the status select, and `POST /api/projects/{id}/status` and `/deadline` answer 409 for them, since the next sync would overwrite the change. Their milestones can still be edited.
 
 | Variable                         | Default    | Meaning                                                   |
 |----------------------------------|------------|-----------------------------------------------------------|
