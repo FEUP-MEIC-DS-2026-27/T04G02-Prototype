@@ -4,6 +4,7 @@ namespace Tests\Feature\Kafka;
 
 use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Junges\Kafka\Facades\Kafka;
 use Junges\Kafka\Message\ConsumedMessage;
 use Junges\Kafka\Message\Message;
@@ -17,7 +18,10 @@ class ConsumeSourceProjectEventsTest extends TestCase
     {
         parent::setUp();
 
-        config(['project_source.kafka_brokers' => 'post-events-kafka:9092']);
+        config([
+            'project_source.kafka_brokers' => 'post-events-kafka:9092',
+            'project_source.api_url' => null,
+        ]);
         Kafka::fake();
     }
 
@@ -68,6 +72,31 @@ class ConsumeSourceProjectEventsTest extends TestCase
             'status' => 'cancelled',
             'source_status' => 'Cancelled',
         ]);
+    }
+
+    public function test_it_imports_the_projects_before_following_the_topic(): void
+    {
+        config(['project_source.api_url' => 'http://projects-service:8080']);
+        Http::fake(['http://projects-service:8080/api/projects' => Http::response([
+            ['id' => 'INE-1', 'title' => 'From the API', 'status' => 'Planned'],
+            ['id' => 'INE-2', 'title' => 'Only in the API', 'status' => 'Active'],
+        ])]);
+
+        $this->receive($this->event('updated', 'INE-1', ['status' => 'Completed']));
+
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-1', 'status' => 'completed']);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-2', 'status' => 'active']);
+    }
+
+    public function test_a_failed_import_does_not_stop_the_consumer(): void
+    {
+        config(['project_source.api_url' => 'http://projects-service:8080']);
+        Http::fake(['http://projects-service:8080/api/projects' => Http::response('down', 503)]);
+
+        $this->receive($this->event('created', 'INE-1'));
+
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-1']);
     }
 
     public function test_a_deleted_event_removes_the_project(): void

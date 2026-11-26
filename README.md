@@ -180,7 +180,7 @@ Most missing pieces fail quietly, so check these if the dashboard shows the wron
 
 `compose.hi.yaml` joins h.i's Docker network and:
 - has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. It also removes the projects it imported before that are no longer in projects-service (deleted while the consumer wasn't running); projects from other systems are kept. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
-- adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live.
+- adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live. On start it runs the same import first, then reads only new messages (`PROJECTS_SOURCE_OFFSET_RESET=latest`; the image's `KAFKA_OFFSET_RESET=earliest` is for `project-status-consumer`), so changes made while it wasn't running come from the API rather than from replaying the topic.
 
 Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`. projects-service owns their status and deadline: the dashboard shows "Set in projects-service" instead of the status select, and `POST /api/projects/{id}/status` and `/deadline` answer 409 for them, since the next sync would overwrite the change. Their milestones can still be edited.
 
@@ -189,6 +189,7 @@ Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). The
 | `PROJECTS_SOURCE_API_URL`        | (empty)    | projects-service base URL. Empty = no import              |
 | `PROJECTS_SOURCE_KAFKA_BROKERS`  | (empty)    | Broker with the `projects` topic. Empty = consumer exits  |
 | `PROJECTS_SOURCE_TOPIC`          | `projects` | Topic to follow                                           |
+| `PROJECTS_SOURCE_OFFSET_RESET`   | `latest`   | Where a new consumer group starts on that topic           |
 
 ### Statuses
 
@@ -236,7 +237,7 @@ To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
 | Folder                  | What it covers                                                               |
 |-------------------------|------------------------------------------------------------------------------|
 | `tests/Feature/Api`     | `GET /api/projects` (stats for the five statuses), `POST /api/projects/{id}/status` (incl. the Kafka event it publishes, rejecting the old statuses), CORS for the h.i origins |
-| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing |
+| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing, the import before consuming |
 | `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples and deleted projects, failed requests (HTTP faked) |
 
 ### Frontend (dashboard)

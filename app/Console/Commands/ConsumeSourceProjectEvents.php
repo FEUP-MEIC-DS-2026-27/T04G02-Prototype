@@ -23,8 +23,17 @@ class ConsumeSourceProjectEvents extends Command
             return self::FAILURE;
         }
 
+        // Catch up first: a new consumer group only reads new messages (PROJECTS_SOURCE_OFFSET_RESET=latest),
+        // so changes made while it wasn't running come from the API instead.
+        // If the import fails, keep going: live changes are still worth following.
+        $apiUrl = config('project_source.api_url');
+        if (is_string($apiUrl) && $apiUrl !== '' && $this->call('projects:import', ['--without-samples' => true]) !== self::SUCCESS) {
+            $this->warn('Could not import the projects first, following the topic anyway.');
+        }
+
         $consumer = Kafka::consumer([config('project_source.topic')], config('project_source.consumer_group'), $brokers)
             ->withAutoCommit()
+            ->withOption('auto.offset.reset', config('project_source.offset_reset'))
             ->withHandler(fn (ConsumerMessage $message) => $this->handleEvent($sync, $message->getBody()))
             ->build();
 

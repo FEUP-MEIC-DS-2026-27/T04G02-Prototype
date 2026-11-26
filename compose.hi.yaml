@@ -34,7 +34,6 @@ services:
       DB_USERNAME: ${DB_USERNAME:-laravel}
       DB_PASSWORD: ${DB_PASSWORD:-secret}
       APP_KEY: ${APP_KEY:-}
-      KAFKA_OFFSET_RESET: earliest
     restart: unless-stopped
     networks: [default, hi]
     depends_on:
