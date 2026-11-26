@@ -153,7 +153,7 @@ function AlertBadge({ alert }: { alert: ProjectAlert }) {
             className={`badge rounded-pill px-3 py-2`}
             title={alert.messages.join('\n') || undefined}
         >
-            <span aria-hidden="true">{s.icon}</span> 
+            <span aria-hidden="true">{s.icon}</span>
         </span>
     );
 }
@@ -522,12 +522,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 <tr>
                                      <th scope="col"><span className="visually-hidden">Milestones</span></th>
                                         <th scope="col" className="fw-medium small">ID</th>
-                                                                        
-                                  
+
+
                                     <th scope="col" className="fw-medium small">Project Name</th>
                                     <th scope="col" className="fw-medium small">Programme</th>
-                                    <th scope="col" className="fw-medium small">Deadline</th> 
-                                    <th scope="col" className="fw-medium small">Alert</th>  
+                                    <th scope="col" className="fw-medium small">Deadline</th>
+                                    <th scope="col" className="fw-medium small">Alert</th>
                                     <th scope="col" className="fw-medium small">Status</th>
                                     <th scope="col" className="fw-medium small">Change Status</th>
                                 </tr>

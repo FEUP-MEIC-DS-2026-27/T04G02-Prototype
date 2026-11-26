@@ -114,6 +114,30 @@ class ImportSourceProjectsTest extends TestCase
         $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0001']);
     }
 
+    public function test_it_fails_and_keeps_the_samples_when_no_project_can_be_imported(): void
+    {
+        $sample = Project::factory()->create(['external_id' => null]);
+        Http::fake([self::URL => Http::response([
+            $this->sourceProject(['status' => 'Archived']),
+            $this->sourceProject(['id' => null]),
+        ])]);
+
+        $this->artisan('projects:import', ['--without-samples' => true])->assertFailed();
+
+        $this->assertModelExists($sample);
+        $this->assertDatabaseCount('projects', 1);
+    }
+
+    public function test_an_empty_source_keeps_the_samples(): void
+    {
+        $sample = Project::factory()->create(['external_id' => null]);
+        Http::fake([self::URL => Http::response([])]);
+
+        $this->artisan('projects:import', ['--without-samples' => true])->assertSuccessful();
+
+        $this->assertModelExists($sample);
+    }
+
     public function test_a_failed_request_keeps_the_existing_projects(): void
     {
         $sample = Project::factory()->create(['external_id' => null]);

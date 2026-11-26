@@ -71,7 +71,7 @@ const seed: TestProject[] = [
   {
     id: 1,
     name: 'Alpha',
-    status: 'in_progress',
+    status: 'active',
     milestones: [
       { title: 'Design', deadline: '2026-10-01', status: 'achieved', assignee: 'Ana Ribeiro' },
       { title: 'Launch', deadline: '2026-12-01', status: 'not_achieved', assignee: 'Ana Ribeiro' },
@@ -82,7 +82,7 @@ const seed: TestProject[] = [
   {
     id: 2,
     name: 'Beta',
-    status: 'pending',
+    status: 'planned',
     milestones: [{ title: 'Kickoff', deadline: '2026-12-01', status: 'not_achieved' }],
   },
 ];

@@ -20,9 +20,9 @@ const SSE = 'http://sse.test/events';
 
 const seed: FakeProject[] = [
   { id: 1, name: 'October', status: 'completed', programme: 'FCT', deadline: '2026-10-15' },
-  { id: 2, name: 'Early December', status: 'in_progress', programme: 'FCT', deadline: '2026-12-01' },
-  { id: 3, name: 'Late December', status: 'pending', programme: 'Horizon Europe', deadline: '2026-12-31T00:00:00.000000Z' },
-  { id: 4, name: 'Undated', status: 'pending', programme: 'FCT', deadline: null },
+  { id: 2, name: 'Early December', status: 'active', programme: 'FCT', deadline: '2026-12-01' },
+  { id: 3, name: 'Late December', status: 'planned', programme: 'Horizon Europe', deadline: '2026-12-31T00:00:00.000000Z' },
+  { id: 4, name: 'Undated', status: 'planned', programme: 'FCT', deadline: null },
 ];
 
 async function renderDashboard() {
@@ -97,10 +97,10 @@ describe('deadline filter', () => {
     expect(shownNames()).toEqual(['Early December', 'Late December']);
     expect(screen.getByText(/^Showing/)).toHaveTextContent('Showing 2 of 4 projects.');
     expect(statCard('Total Projects')).toHaveTextContent('2');
-    expect(statCard('Pending')).toHaveTextContent('1');
-    expect(statCard('In Progress')).toHaveTextContent('1');
+    expect(statCard('Planned')).toHaveTextContent('1');
+    expect(statCard('Active')).toHaveTextContent('1');
     expect(statCard('Completed')).toHaveTextContent('0');
-    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,0');
+    expect(screen.getByTestId('status-chart')).toHaveTextContent('1,1,0,0,0');
   });
 
   it('accepts only a start or only an end date', async () => {
@@ -146,7 +146,7 @@ describe('deadline filter', () => {
     await renderDashboard();
     act(() => {
       FakeEventSource.latest().emit({ project_id: 1, status: 'completed', timestamp: 't1' });
-      FakeEventSource.latest().emit({ project_id: 3, status: 'pending', timestamp: 't2' });
+      FakeEventSource.latest().emit({ project_id: 3, status: 'planned', timestamp: 't2' });
     });
     const feed = () => screen.getByRole('heading', { name: 'Recent SSE Events' }).parentElement!;
     expect(within(feed()).getAllByRole('listitem')).toHaveLength(2);

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 class ImportSourceProjects extends Command
 {
     protected $signature = 'projects:import
-        {--without-samples : Delete the sample projects (no external_id) after a successful import}';
+        {--without-samples : Delete the sample projects (no external_id) once at least one project is imported}';
 
     protected $description = "Import every project from h.i's projects-service into the projects table";
 
@@ -56,7 +56,15 @@ class ImportSourceProjects extends Command
             }
         }
 
-        if ($this->option('without-samples')) {
+        // Every project was skipped: fail, so the samples stay and the error shows up
+        if ($imported === 0 && count($projects) > 0) {
+            $this->error('None of the '.count($projects)." projects from {$url} could be imported.");
+
+            return self::FAILURE;
+        }
+
+        // Only replace the samples with real projects, never with an empty table
+        if ($this->option('without-samples') && $imported > 0) {
             $removed = Project::whereNull('external_id')->delete();
             $this->info("Removed {$removed} sample projects.");
         }
