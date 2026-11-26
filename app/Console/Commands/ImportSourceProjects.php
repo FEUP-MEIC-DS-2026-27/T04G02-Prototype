@@ -63,6 +63,21 @@ class ImportSourceProjects extends Command
             return self::FAILURE;
         }
 
+        // Projects deleted in projects-service while the consumer wasn't running.
+        // Only rows imported from it (source_status set), not other systems' projects.
+        // A project that is still listed but was skipped (e.g. unknown status) is kept.
+        if ($imported > 0) {
+            $sourceIds = array_values(array_filter(
+                array_map(fn ($source) => is_array($source) ? ($source['id'] ?? null) : null, $projects),
+                fn ($id) => is_string($id) && $id !== '',
+            ));
+            $deleted = Project::whereNotNull('source_status')->whereNotIn('external_id', $sourceIds)->delete();
+
+            if ($deleted > 0) {
+                $this->info("Removed {$deleted} projects that are no longer in projects-service.");
+            }
+        }
+
         // Only replace the samples with real projects, never with an empty table
         if ($this->option('without-samples') && $imported > 0) {
             $removed = Project::whereNull('external_id')->delete();

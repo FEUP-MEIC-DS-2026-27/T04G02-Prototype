@@ -114,6 +114,47 @@ class ImportSourceProjectsTest extends TestCase
         $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0001']);
     }
 
+    public function test_projects_no_longer_in_the_source_are_removed(): void
+    {
+        Http::fakeSequence(self::URL)
+            ->push([$this->sourceProject(), $this->sourceProject(['id' => 'INE-25-0002'])])
+            ->push([$this->sourceProject()]);
+
+        $this->artisan('projects:import')->assertSuccessful();
+        $this->artisan('projects:import')->assertSuccessful();
+
+        $this->assertDatabaseCount('projects', 1);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0001']);
+    }
+
+    public function test_removing_keeps_other_systems_and_skipped_source_projects(): void
+    {
+        $sample = Project::factory()->create(['external_id' => null]);
+        $simulated = Project::factory()->create(['external_id' => 'sim-1']);
+        Http::fakeSequence(self::URL)
+            ->push([$this->sourceProject(), $this->sourceProject(['id' => 'INE-25-0002'])])
+            ->push([$this->sourceProject(), $this->sourceProject(['id' => 'INE-25-0002', 'status' => 'Archived'])]);
+
+        $this->artisan('projects:import')->assertSuccessful();
+        $this->artisan('projects:import')->assertSuccessful();
+
+        $this->assertModelExists($sample);
+        $this->assertModelExists($simulated);
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0002', 'status' => 'active']);
+    }
+
+    public function test_nothing_is_removed_when_no_project_can_be_imported(): void
+    {
+        Http::fakeSequence(self::URL)
+            ->push([$this->sourceProject()])
+            ->push([$this->sourceProject(['id' => 'INE-25-0002', 'status' => 'Archived'])]);
+
+        $this->artisan('projects:import')->assertSuccessful();
+        $this->artisan('projects:import')->assertFailed();
+
+        $this->assertDatabaseHas('projects', ['external_id' => 'INE-25-0001']);
+    }
+
     public function test_it_fails_and_keeps_the_samples_when_no_project_can_be_imported(): void
     {
         $sample = Project::factory()->create(['external_id' => null]);

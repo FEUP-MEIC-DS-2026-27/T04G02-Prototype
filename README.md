@@ -153,14 +153,33 @@ Or reset everything to the sample projects with `make reset` (this also deletes 
 
 ## Real project data from h.i
 
-The sample projects are only used when nothing else is configured. With h.i running, the projects come from VA3's `projects-service`, which owns them:
+The sample projects are only used when nothing else is configured. With h.i running, the projects come from VA3's `projects-service`, which owns them.
+
+### Before you start
+
+This stack replaces h.i's own project status services, so run only the h.i services it reads from. In h.i's `federation-value-areas` folder:
 
 ```shell
-# start h.i's federation-value-areas stack first, then from this repository:
+# What this stack reads: the projects API and the broker with the `projects` topic
+docker compose up -d projects-service post-events-service
+# h.i's copy of this stack uses the same ports (8340, 8341) and service names
+docker compose stop $(docker compose config --services | grep '^project-status-')
+```
+
+Then, from this repository:
+
+```shell
 docker compose -f compose.yaml -f compose.hi.yaml up -d --build
 ```
+
+Most missing pieces fail quietly, so check these if the dashboard shows the wrong data:
+- h.i never started (no `federation-value-areas_default` network): `up` stops with `network federation-value-areas_default not found`.
+- `projects-service` isn't running: the import fails (see `docker compose -f compose.yaml -f compose.hi.yaml logs project-status-api`) and the dashboard keeps the projects it already had, or the sample projects. Once it is up, run `docker compose -f compose.yaml -f compose.hi.yaml restart project-status-api`.
+- `post-events-service` isn't running: `project-status-source-consumer` keeps restarting and the dashboard doesn't update live.
+- h.i's `project-status-*` services are running: `project-status-api` can't publish port 8340 ("port is already allocated"), and h.i's gateway may send VA3's requests to this stack's API instead of its own.
+
 `compose.hi.yaml` joins h.i's Docker network and:
-- has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
+- has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. It also removes the projects it imported before that are no longer in projects-service (deleted while the consumer wasn't running); projects from other systems are kept. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
 - adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live.
 
 Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`.
@@ -218,7 +237,7 @@ To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
 |-------------------------|------------------------------------------------------------------------------|
 | `tests/Feature/Api`     | `GET /api/projects` (stats for the five statuses), `POST /api/projects/{id}/status` (incl. the Kafka event it publishes, rejecting the old statuses), CORS for the h.i origins |
 | `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing |
-| `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples, failed requests (HTTP faked) |
+| `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples and deleted projects, failed requests (HTTP faked) |
 
 ### Frontend (dashboard)
 
