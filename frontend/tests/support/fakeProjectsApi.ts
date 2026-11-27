@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-type Status = 'pending' | 'in_progress' | 'completed';
+type Status = 'planned' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 
 export interface FakeProject {
   id: number;
@@ -8,9 +8,10 @@ export interface FakeProject {
   status: Status;
   programme?: string | null;
   deadline?: string | null;
+  source_status?: string | null;
 }
 
-const statuses: Status[] = ['pending', 'in_progress', 'completed'];
+const statuses: Status[] = ['planned', 'active', 'on_hold', 'completed', 'cancelled'];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -29,9 +30,7 @@ export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[], 
     projects,
     stats: {
       total: projects.length,
-      pending: projects.filter((p) => p.status === 'pending').length,
-      in_progress: projects.filter((p) => p.status === 'in_progress').length,
-      completed: projects.filter((p) => p.status === 'completed').length,
+      ...Object.fromEntries(statuses.map((s) => [s, projects.filter((p) => p.status === s).length])),
     },
   });
 
@@ -62,6 +61,9 @@ export function installFakeProjectsApi(baseUrl: string, initial: FakeProject[], 
       }
       const project = projects.find((p) => p.id === Number(update[1]));
       if (!project) return json({ message: `No query results for model [App\\Models\\Project] ${update[1]}` }, 404);
+      if (project.source_status) {
+        return json({ message: 'This project comes from projects-service, so its status and deadline can only be changed there.' }, 409);
+      }
       project.status = body.status;
       return json({ message: 'Status updated and event published to Kafka', data: project });
     }

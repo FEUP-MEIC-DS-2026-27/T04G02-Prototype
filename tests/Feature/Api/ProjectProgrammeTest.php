@@ -13,7 +13,7 @@ class ProjectProgrammeTest extends TestCase
     public function test_inventory_exposes_programmes_and_preserves_unassigned_projects(): void
     {
         $assigned = Project::create([
-            'name' => 'Research project', 'status' => 'pending', 'programme' => 'Horizon Europe',
+            'name' => 'Research project', 'status' => 'planned', 'programme' => 'Horizon Europe',
         ]);
         $unassigned = Project::create(['name' => 'Legacy project', 'status' => 'completed']);
 

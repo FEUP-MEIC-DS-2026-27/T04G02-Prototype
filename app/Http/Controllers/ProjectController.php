@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Junges\Kafka\Facades\Kafka;
 use Junges\Kafka\Message\Message;
 
@@ -11,25 +12,30 @@ class ProjectController extends Controller
 {
     public function index()
     {
+        $counts = Project::selectRaw('status, count(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status');
+        $stats = ['total' => (int) $counts->sum()];
+        foreach (Project::STATUSES as $status) {
+            $stats[$status] = (int) ($counts[$status] ?? 0);
+        }
+
         return response()->json([
             'projects' => Project::orderBy('id', 'asc')->get(),
-            'stats' => [
-                'total'       => Project::count(),
-                'pending'     => Project::where('status', 'pending')->count(),
-                'in_progress' => Project::where('status', 'in_progress')->count(),
-                'completed'   => Project::where('status', 'completed')->count(),
-            ],
-            
+            'stats' => $stats,
         ]);
     }
 
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,in_progress,completed'
+            'status' => ['required', 'string', Rule::in(Project::STATUSES)],
         ]);
 
         $project = Project::findOrFail($id);
+
+        if ($response = $this->rejectIfFromProjectsService($project)) {
+            return $response;
+        }
+
         $project->update(['status' => $validated['status']]);
 
         $message = new Message(
@@ -95,6 +101,11 @@ class ProjectController extends Controller
         ]);
 
         $project = Project::findOrFail($id);
+
+        if ($response = $this->rejectIfFromProjectsService($project)) {
+            return $response;
+        }
+
         $project->update(['deadline' => $validated['deadline']]);
         $message = new Message(
             body: [
@@ -113,5 +124,18 @@ class ProjectController extends Controller
             'message' => 'Deadline updated successfully',
             'data'    => $project,
         ]);
+    }
+
+    // projects-service owns the status and deadline of the projects imported from it:
+    // a change here would be overwritten by the next sync and never reach it.
+    private function rejectIfFromProjectsService(Project $project)
+    {
+        if ($project->source_status === null) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'This project comes from projects-service, so its status and deadline can only be changed there.',
+        ], 409);
     }
 }

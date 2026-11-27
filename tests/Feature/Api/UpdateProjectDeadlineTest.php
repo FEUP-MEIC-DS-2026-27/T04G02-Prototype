@@ -93,4 +93,16 @@ class UpdateProjectDeadlineTest extends TestCase
 
         Kafka::assertNothingPublished();
     }
+
+    public function test_it_rejects_changing_the_deadline_of_a_project_from_projects_service(): void
+    {
+        $project = Project::factory()->create(['external_id' => 'INE-25-0001', 'status' => 'active', 'source_status' => 'Active', 'deadline' => null]);
+
+        $this->postJson("/api/projects/{$project->id}/deadline", ['deadline' => '2026-12-31'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'This project comes from projects-service, so its status and deadline can only be changed there.');
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'deadline' => null]);
+        Kafka::assertNothingPublished();
+    }
 }

@@ -64,7 +64,7 @@ docker compose up -d --build
 The API container runs the migrations on start and seeds the sample projects when the table is empty. The consumer waits for the API to be healthy, so the tables always exist before it starts.
 `make up`, `make stop`, `make logs`, `make reset` (drops the database volume) and `make test` (see [Testing](#testing)) wrap the usual commands.
 
-Running next to h.i: both stacks publish ports 8340 and 8341 by default. Start this one on other host ports with `API_HOST_PORT=8350 SSE_HOST_PORT=8351 docker compose up -d --build` (or set them in `.env`). The dashboard is built to call those ports.
+Running next to h.i: h.i only publishes its shell (port 80), so this stack can use 8340 and 8341. If something else already uses them (for example your own `compose.override.yaml` in h.i), start this one on other host ports with `API_HOST_PORT=8350 SSE_HOST_PORT=8351 docker compose up -d --build` (or set them in `.env`). The dashboard is built to call those ports.
 
 A `.env` file is optional: `compose.yaml` has defaults for everything, and `.env.example` lists what you can override.
 Without an `APP_KEY`, the container generates a temporary one on each start. That's fine because the API has no sessions or logins. To pin one, run `docker compose run --rm --no-deps project-status-api php artisan key:generate --show` and put the result in `.env`.
@@ -115,7 +115,7 @@ Events on the `project-status-events` topic are JSON objects with:
 
 | Field         | Required | Meaning                                                                                   |
 |---------------|----------|-------------------------------------------------------------------------------------------|
-| `status`      | yes      | `pending`, `in_progress` or `completed`                                                   |
+| `status`      | yes      | `planned`, `active`, `on_hold`, `completed` or `cancelled` (see [Statuses](#statuses))    |
 | `project_id`  | one of   | This app's own project id. Only updates an existing project, never creates one            |
 | `external_id` | one of   | Another system's id. Creates the project if it doesn't exist yet, otherwise updates it    |
 | `name`        | no       | Project name, used when the project is created (defaults to `Untitled Project`)           |
@@ -129,8 +129,8 @@ Events with an invalid `status`, or with neither id, are skipped by `project-sta
 Publish events with Kafka's console producer, one JSON object per line. Use an `external_id` starting with `sim-` so the test projects are easy to clean up:
 ```shell
 docker compose exec -T project-status-kafka kafka-console-producer --bootstrap-server project-status-kafka:29092 --topic project-status-events <<'EOF'
-{"external_id":"sim-1","name":"CRM Import","status":"pending","timestamp":"2026-10-30T12:00:00Z"}
-{"external_id":"sim-2","name":"Billing Sync","status":"in_progress"}
+{"external_id":"sim-1","name":"CRM Import","status":"planned","timestamp":"2026-10-30T12:00:00Z"}
+{"external_id":"sim-2","name":"Billing Sync","status":"active"}
 {"external_id":"sim-1","status":"completed"}
 EOF
 ```
@@ -150,6 +150,67 @@ docker compose exec project-status-api php artisan tinker --execute="App\Models\
 Or reset everything to the sample projects with `make reset` (this also deletes the database volume).
 
 > **`php artisan kafka:simulate-projects` doesn't work in the Docker image.** It builds fake projects with `ProjectFactory`, which needs Faker. Faker is a dev dependency, and the image is built with `composer install --no-dev` so test tools stay out of production. For the same reason, `migrate:fresh --seed` fails in the container, because `DatabaseSeeder` also uses a factory.
+
+## Real project data from h.i
+
+The sample projects are only used when nothing else is configured. With h.i running, the projects come from VA3's `projects-service`, which owns them.
+
+### Before you start
+
+This stack replaces h.i's own project status services, so run only the h.i services it reads from. In h.i's `federation-value-areas` folder:
+
+```shell
+# What this stack reads: the projects API and the broker with the `projects` topic
+docker compose up -d projects-service post-events-service
+# h.i's copy of this stack uses the same ports (8340, 8341) and service names
+docker compose stop $(docker compose config --services | grep '^project-status-')
+```
+
+Then, from this repository:
+
+```shell
+docker compose -f compose.yaml -f compose.hi.yaml up -d --build
+```
+
+Most missing pieces fail quietly, so check these if the dashboard shows the wrong data:
+- h.i never started (no `federation-value-areas_default` network): `up` stops with `network federation-value-areas_default not found`.
+- `projects-service` isn't running: the import fails (see `docker compose -f compose.yaml -f compose.hi.yaml logs project-status-api`) and the dashboard keeps the projects it already had, or the sample projects. Once it is up, run `docker compose -f compose.yaml -f compose.hi.yaml restart project-status-api`.
+- `post-events-service` isn't running: `project-status-source-consumer` keeps restarting and the dashboard doesn't update live.
+- h.i's `project-status-*` services are running: both stacks then have a `project-status-api` on h.i's network, so h.i's gateway may send VA3's requests to this stack's API instead of its own. h.i doesn't publish their ports, so nothing reports a clash.
+
+`compose.hi.yaml` joins h.i's Docker network and:
+- has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. It also removes the projects it imported before that are no longer in projects-service (deleted while the consumer wasn't running); projects from other systems are kept. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
+- adds `project-status-source-consumer` (`php artisan kafka:consume-source-projects`), which follows the `projects` topic on h.i's `post-events-kafka` (`created`, `updated` and `deleted` events) and republishes each change on `project-status-events`, so the dashboard updates live. On start it runs the same import first, then reads only new messages (`PROJECTS_SOURCE_OFFSET_RESET=latest`; the image's `KAFKA_OFFSET_RESET=earliest` is for `project-status-consumer`), so changes made while it wasn't running come from the API rather than from replaying the topic.
+
+Source projects are matched on `external_id` (their id, e.g. `INE-25-0001`). Their `title` becomes `name` and their `end` date becomes `deadline`. projects-service owns their status and deadline: the dashboard shows "Set in projects-service" instead of the status select, and `POST /api/projects/{id}/status` and `/deadline` answer 409 for them, since the next sync would overwrite the change. Their milestones can still be edited.
+
+| Variable                         | Default    | Meaning                                                   |
+|----------------------------------|------------|-----------------------------------------------------------|
+| `PROJECTS_SOURCE_API_URL`        | (empty)    | projects-service base URL. Empty = no import              |
+| `PROJECTS_SOURCE_KAFKA_BROKERS`  | (empty)    | Broker with the `projects` topic. Empty = consumer exits  |
+| `PROJECTS_SOURCE_TOPIC`          | `projects` | Topic to follow                                           |
+| `PROJECTS_SOURCE_OFFSET_RESET`   | `latest`   | Where a new consumer group starts on that topic           |
+
+### Statuses
+
+The dashboard uses the same five statuses as projects-service (`Project::STATUSES`). `config/project_source.php` maps their names, and the original one is also stored in `source_status`:
+
+| projects-service | `status`    | Dashboard        |
+|------------------|-------------|------------------|
+| Planned          | `planned`   | grey             |
+| Active           | `active`    | blue             |
+| On Hold          | `on_hold`   | yellow           |
+| Completed        | `completed` | green            |
+| Cancelled        | `cancelled` | red              |
+
+A status missing from the map is skipped with a warning.
+
+The old `pending` and `in_progress` statuses were renamed (migration `2026_11_19_110000_use_project_service_statuses`) and the API now rejects them with a 422. h.i's tests that mock this API must use the new names.
+
+### Known limitations
+
+- In h.i's development stack, `post-events-service` generates simulated changes on the topic only; the projects-service API keeps the original data. Restarting `project-status-api` re-imports that original data, and the dashboard catches up as new events arrive.
+- projects-service owns the status, so a status changed from the dashboard is overwritten by the next event for that project.
 
 ## Testing
 
@@ -175,8 +236,9 @@ To run one file or test: `php artisan test --filter=UpdateProjectStatusTest`.
 
 | Folder                  | What it covers                                                               |
 |-------------------------|------------------------------------------------------------------------------|
-| `tests/Feature/Api`     | `GET /api/projects`, `POST /api/projects/{id}/status` (incl. the Kafka event it publishes), CORS for the h.i origins |
-| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events |
+| `tests/Feature/Api`     | `GET /api/projects` (stats for the five statuses), `POST /api/projects/{id}/status` (incl. the Kafka event it publishes, rejecting the old statuses), CORS for the h.i origins |
+| `tests/Feature/Kafka`   | `kafka:consume-projects`: updates by `project_id`, create/update by `external_id`, skipped events. `kafka:consume-source-projects`: created/updated/deleted events from projects-service, tombstones, republishing, the import before consuming |
+| `tests/Feature/ProjectSource` | `projects:import`: status mapping, re-imports, removing the samples and deleted projects, failed requests (HTTP faked) |
 
 ### Frontend (dashboard)
 

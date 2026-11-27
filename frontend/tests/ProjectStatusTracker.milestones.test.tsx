@@ -80,9 +80,11 @@ function installApi(initial: TestProject[]) {
           projects,
           stats: {
             total: projects.length,
-            pending: count('pending'),
-            in_progress: count('in_progress'),
+            planned: count('planned'),
+            active: count('active'),
+            on_hold: count('on_hold'),
             completed: count('completed'),
+            cancelled: count('cancelled'),
           },
         });
       }
@@ -128,14 +130,14 @@ const withMilestones: TestProject[] = [
   {
     id: 1,
     name: 'Alpha',
-    status: 'in_progress',
+    status: 'active',
     deadline: '2026-12-31T00:00:00.000000Z',
     milestones: [
       { title: 'Launch', deadline: '2026-12-01', status: 'not_achieved' },
       { title: 'Design', deadline: '2026-10-01', status: 'not_achieved' },
     ],
   },
-  { id: 2, name: 'Beta', status: 'pending', deadline: null, milestones: [] },
+  { id: 2, name: 'Beta', status: 'planned', deadline: null, milestones: [] },
   { id: 3, name: 'Gamma', status: 'completed' }, // no milestones field at all
 ];
 
@@ -210,7 +212,7 @@ describe('milestones', () => {
       {
         id: 1,
         name: 'Alpha',
-        status: 'pending',
+        status: 'planned',
         milestones: [
           { title: 'Launch', deadline: null, status: 'not_achieved' },
           { title: 'Review', deadline: '2026-12-01', status: 'not_achieved' },
@@ -250,7 +252,7 @@ describe('milestones', () => {
 
   it('shows an achieved milestone with a checked checkbox', async () => {
     const api = installApi([
-      { id: 1, name: 'Alpha', status: 'pending', milestones: [{ title: 'Design', status: 'achieved' }] },
+      { id: 1, name: 'Alpha', status: 'planned', milestones: [{ title: 'Design', status: 'achieved' }] },
     ]);
     const user = userEvent.setup();
     renderDashboard();
@@ -284,7 +286,7 @@ describe('milestones', () => {
 
   it('sends not_achieved when a milestone is unticked', async () => {
     const api = installApi([
-      { id: 1, name: 'Alpha', status: 'pending', milestones: [{ title: 'Design', status: 'achieved' }] },
+      { id: 1, name: 'Alpha', status: 'planned', milestones: [{ title: 'Design', status: 'achieved' }] },
     ]);
     const user = userEvent.setup();
     renderDashboard();

@@ -25,7 +25,7 @@ interface ProjectStatusTrackerProps {
     sseUrl?: string;
 }
 
-type ProjectStatus = 'pending' | 'in_progress' | 'completed';
+type ProjectStatus = 'planned' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 interface Project {
     id: number;
     name: string;
@@ -33,12 +33,16 @@ interface Project {
     programme?: string | null;
     deadline?: string | null;
     milestones?: Milestone[];
+    /** Set for projects imported from h.i's projects-service, which owns their status. */
+    source_status?: string | null;
 }
 export interface Stats {
     total: number;
-    pending: number;
-    in_progress: number;
+    planned: number;
+    active: number;
+    on_hold: number;
     completed: number;
+    cancelled: number;
 }
 
 interface Project {
@@ -57,6 +61,9 @@ interface StatusEvent {
     status?: string;
     milestones?: Milestone[];
     deadline?: string | null;
+    // From projects-service
+    source_status?: string;
+    deleted?: boolean;
     timestamp: string;
 }
 
@@ -68,7 +75,7 @@ const chartTypes: { value: ChartType; label: string }[] = [
     { value: 'doughnut', label: 'Donut' },
     { value: 'bar', label: 'Bar' },
 ];
-const emptyStats: Stats = { total: 0, pending: 0, in_progress: 0, completed: 0 };
+const emptyStats: Stats = { total: 0, planned: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 };
 const formatDeadline = (d?: string | null) => (d ? d.slice(0, 10) : '—');
 const UNASSIGNED = '__unassigned__';
 const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
@@ -77,17 +84,26 @@ const ANY_DEADLINE: DeadlineRange = { from: '', to: '' };
 // clickable, so it opts out of that highlight.
 const NO_ROW_HOVER = { '--bs-table-hover-bg': 'transparent' } as CSSProperties;
 const programmeName = (p: Project) => p.programme?.trim() || '';
+
+/** Live events arriving within this window cause a single reload of the projects. */
+const REFRESH_DELAY_MS = 300;
 function describeEvent(evt: StatusEvent): string {
+    if (evt.deleted) return 'removed';
+    if (evt.status && evt.source_status) return `updated to ${evt.status} (${evt.source_status})`;
     if (evt.status) return `updated to ${evt.status}`;
     if (evt.milestones) return 'milestones updated';
     if ('deadline' in evt) return 'deadline updated';
     return 'updated';
 }
-const badgeStyles: Record<ProjectStatus, { bg: string; text: string; label: string }> = {
-    pending: { bg: 'bg-warning-subtle', text: 'text-warning-emphasis', label: 'Pending' },
-    in_progress: { bg: 'bg-primary-subtle', text: 'text-primary-emphasis', label: 'In Progress' },
-    completed: { bg: 'bg-success-subtle', text: 'text-success-emphasis', label: 'Completed' },
+// tone = Bootstrap color, color = chart color
+const badgeStyles: Record<ProjectStatus, { label: string; tone: string; color: string }> = {
+    planned: { label: 'Planned', tone: 'secondary', color: '#6c757d' },
+    active: { label: 'Active', tone: 'primary', color: '#0d6efd' },
+    on_hold: { label: 'On Hold', tone: 'warning', color: '#ffc107' },
+    completed: { label: 'Completed', tone: 'success', color: '#198754' },
+    cancelled: { label: 'Cancelled', tone: 'danger', color: '#dc3545' },
 };
+const statusOrder = Object.keys(badgeStyles) as ProjectStatus[];
 
 
 export function createStatusDistributionOptions(stats: Stats) {
@@ -104,9 +120,9 @@ export function createStatusDistributionOptions(stats: Stats) {
 }
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
-    const s = badgeStyles[status] ?? badgeStyles.pending;
+    const s = badgeStyles[status] ?? badgeStyles.planned;
     return (
-        <span className={`badge ${s.bg} ${s.text} rounded-pill px-3 py-2`}>
+        <span className={`badge bg-${s.tone}-subtle text-${s.tone}-emphasis rounded-pill px-3 py-2`}>
             {s.label}
         </span>
     );
@@ -142,7 +158,7 @@ function AlertBadge({ alert }: { alert: ProjectAlert }) {
             className={`badge rounded-pill px-3 py-2`}
             title={alert.messages.join('\n') || undefined}
         >
-            <span aria-hidden="true">{s.icon}</span> 
+            <span aria-hidden="true">{s.icon}</span>
         </span>
     );
 }
@@ -166,11 +182,11 @@ async function readJson<T>(res: Response, what: string): Promise<T> {
 }
 export function createStatusDistributionData(stats: Stats) {
     return {
-        labels: ['Pending', 'In Progress', 'Completed'],
+        labels: statusOrder.map((s) => badgeStyles[s].label),
         datasets: [
             {
-                data: [stats.pending, stats.in_progress, stats.completed],
-                backgroundColor: ['#ffc107', '#0d6efd', '#198754'],
+                data: statusOrder.map((s) => stats[s]),
+                backgroundColor: statusOrder.map((s) => badgeStyles[s].color),
                 borderColor: '#ffffff',
                 borderWidth: 2,
             },
@@ -312,6 +328,15 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
 
         // EventSource reconnects by itself after an error, so the connection is not closed here.
         const eventSource = new EventSource(sseUrl);
+        // Re-sync at most once per REFRESH_DELAY_MS, however many events arrive
+        let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+        const scheduleRefresh = () => {
+            if (refreshTimer !== undefined) return;
+            refreshTimer = setTimeout(() => {
+                refreshTimer = undefined;
+                fetchProjects(controller.signal);
+            }, REFRESH_DELAY_MS);
+        };
         eventSource.onopen = () => setLive('live');
         eventSource.onmessage = (event: MessageEvent<string>) => {
             try {
@@ -319,11 +344,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                 setEvents((prev) => [data, ...prev.slice(0, 4)]); // Keep the 5 latest events
             } catch {
             }
-            fetchProjects(controller.signal); // Re-sync metric state & chart data
+            scheduleRefresh(); // Re-sync metric state & chart data
         };
         eventSource.onerror = () => setLive('reconnecting');
 
         return () => {
+            clearTimeout(refreshTimer);
             controller.abort();
             eventSource.close();
         };
@@ -333,7 +359,8 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
     const filtering = programme !== '' || selectedProjectId !== '' || isRangeActive(deadlineRange);
     const filteredIds = new Set(filteredProjects.map((p) => p.id));
     const visibleEvents = filtering
-        ? events.filter((evt) => evt.project_id != null && filteredIds.has(evt.project_id))
+        // A deleted project is in no filter any more, so its event always stays visible
+        ? events.filter((evt) => evt.deleted || (evt.project_id != null && filteredIds.has(evt.project_id)))
         : events;
 
     // Chart Data
@@ -356,6 +383,8 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             <div className="card mb-4">
                 <div className="card-body">
                     <div className="row g-3 align-items-end">
+                        {/* Hidden when no project has a programme (e.g. projects-service has none) */}
+                        {programmes.length > 0 && (
                         <div className="col-12 col-md-6 col-xl-3">
                             <label htmlFor="project-programme" className="form-label">Funding programme</label>
                             <select id="project-programme" className="form-select" value={programme}
@@ -365,6 +394,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 <option value={UNASSIGNED}>Unassigned</option>
                             </select>
                         </div>
+                        )}
                         <div className="col-12 col-md-6 col-xl-3">
                             <label htmlFor="project-filter" className="form-label">Project</label>
                             <select id="project-filter" className="form-select" value={selectedProjectId}
@@ -420,7 +450,7 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             )}
 
             {/* 1. Metric Cards */}
-            <div className="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+            <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
                 <div className="col">
                     <div className="card h-100">
                         <div className="card-body text-center">
@@ -429,30 +459,16 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                         </div>
                     </div>
                 </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">Pending</p>
-                            <p className="h3 text-warning mb-0">{stats.pending}</p>
+                {statusOrder.map((s) => (
+                    <div className="col" key={s}>
+                        <div className="card h-100">
+                            <div className="card-body text-center">
+                                <p className="small text-secondary fw-medium mb-1">{badgeStyles[s].label}</p>
+                                <p className={`h3 text-${badgeStyles[s].tone} mb-0`}>{stats[s]}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">In Progress</p>
-                            <p className="h3 text-primary mb-0">{stats.in_progress}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="col">
-                    <div className="card h-100">
-                        <div className="card-body text-center">
-                            <p className="small text-secondary fw-medium mb-1">Completed</p>
-                            <p className="h3 text-success mb-0">{stats.completed}</p>
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
 
             {/* 2. Chart & SSE Feed */}
@@ -525,12 +541,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
                                 <tr>
                                      <th scope="col"><span className="visually-hidden">Milestones</span></th>
                                         <th scope="col" className="fw-medium small">ID</th>
-                                                                        
-                                  
+
+
                                     <th scope="col" className="fw-medium small">Project Name</th>
                                     <th scope="col" className="fw-medium small">Programme</th>
-                                    <th scope="col" className="fw-medium small">Deadline</th> 
-                                    <th scope="col" className="fw-medium small">Alert</th>  
+                                    <th scope="col" className="fw-medium small">Deadline</th>
+                                    <th scope="col" className="fw-medium small">Alert</th>
                                     <th scope="col" className="fw-medium small">Status</th>
                                     <th scope="col" className="fw-medium small">Change Status</th>
                                 </tr>
@@ -562,6 +578,12 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
     <td><AlertBadge alert={alert} /></td>
     <td><StatusBadge status={p.status} /></td>
     <td>
+        {p.source_status ? (
+            <span className="small text-secondary text-nowrap"
+                title="This project comes from h.i's projects-service, which owns its status.">
+                Set in projects-service
+            </span>
+        ) : (
         <select
             value={p.status}
             onChange={(e) => handleStatusChange(p.id, e.target.value as ProjectStatus)}
@@ -569,10 +591,11 @@ i === index ? { ...m, status: achieved ? ('achieved' as const) : ('not_achieved'
             aria-label={`Change status of ${p.name}`}
             className="form-select form-select-sm w-auto"
         >
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
+            {statusOrder.map((s) => (
+                <option key={s} value={s}>{badgeStyles[s].label}</option>
+            ))}
         </select>
+        )}
     </td>
 
             </tr>
