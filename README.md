@@ -64,7 +64,7 @@ docker compose up -d --build
 The API container runs the migrations on start and seeds the sample projects when the table is empty. The consumer waits for the API to be healthy, so the tables always exist before it starts.
 `make up`, `make stop`, `make logs`, `make reset` (drops the database volume) and `make test` (see [Testing](#testing)) wrap the usual commands.
 
-Running next to h.i: both stacks publish ports 8340 and 8341 by default. Start this one on other host ports with `API_HOST_PORT=8350 SSE_HOST_PORT=8351 docker compose up -d --build` (or set them in `.env`). The dashboard is built to call those ports.
+Running next to h.i: h.i only publishes its shell (port 80), so this stack can use 8340 and 8341. If something else already uses them (for example your own `compose.override.yaml` in h.i), start this one on other host ports with `API_HOST_PORT=8350 SSE_HOST_PORT=8351 docker compose up -d --build` (or set them in `.env`). The dashboard is built to call those ports.
 
 A `.env` file is optional: `compose.yaml` has defaults for everything, and `.env.example` lists what you can override.
 Without an `APP_KEY`, the container generates a temporary one on each start. That's fine because the API has no sessions or logins. To pin one, run `docker compose run --rm --no-deps project-status-api php artisan key:generate --show` and put the result in `.env`.
@@ -176,7 +176,7 @@ Most missing pieces fail quietly, so check these if the dashboard shows the wron
 - h.i never started (no `federation-value-areas_default` network): `up` stops with `network federation-value-areas_default not found`.
 - `projects-service` isn't running: the import fails (see `docker compose -f compose.yaml -f compose.hi.yaml logs project-status-api`) and the dashboard keeps the projects it already had, or the sample projects. Once it is up, run `docker compose -f compose.yaml -f compose.hi.yaml restart project-status-api`.
 - `post-events-service` isn't running: `project-status-source-consumer` keeps restarting and the dashboard doesn't update live.
-- h.i's `project-status-*` services are running: `project-status-api` can't publish port 8340 ("port is already allocated"), and h.i's gateway may send VA3's requests to this stack's API instead of its own.
+- h.i's `project-status-*` services are running: both stacks then have a `project-status-api` on h.i's network, so h.i's gateway may send VA3's requests to this stack's API instead of its own. h.i doesn't publish their ports, so nothing reports a clash.
 
 `compose.hi.yaml` joins h.i's Docker network and:
 - has `project-status-api` run `php artisan projects:import --without-samples` on start: it loads every project from `GET /api/projects` and removes the sample projects (only those without an `external_id`) once at least one project was imported. It also removes the projects it imported before that are no longer in projects-service (deleted while the consumer wasn't running); projects from other systems are kept. If the request fails, or none of the projects can be imported (unknown status or no id), the command fails and the API still starts with what the table already has.
